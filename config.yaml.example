@@ -1,0 +1,36 @@
+# ============================================================
+# OpenClaw non-secret configuration
+# Copy this file to config.yaml and edit as needed.
+# Secrets belong in .env only — never here.
+# ============================================================
+
+llm:
+  provider: "none"          # "openai" | "anthropic" | "none"
+  chat_model: "gpt-4o-mini" # ignored if provider = "none"
+  embedding_model: null     # null = embeddings disabled
+
+runtime:
+  tick_seconds: 10           # main loop interval
+  log_level: "INFO"          # DEBUG | INFO | WARNING | ERROR
+  data_dir: "./data"
+  dry_run: true              # SAFE DEFAULT: set false when ready
+
+connectors:
+  cli:
+    enabled: true
+  telegram:
+    enabled: false
+
+actions:
+  # Allowlist of action names the agent may execute.
+  # Any unlisted action is silently blocked.
+  allowlist:
+    - "echo"
+    - "memory_write"
+    - "memory_read"
+  require_confirm: false     # CLI will prompt before executing
+
+health:
+  enabled: true
+  host: "127.0.0.1"
+  port: 8080
