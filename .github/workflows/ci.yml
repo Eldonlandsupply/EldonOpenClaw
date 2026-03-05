@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "dev"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint (ruff)
+        run: |
+          pip install ruff
+          ruff check src/ tests/ main.py scripts/
+
+      - name: Run tests
+        run: pytest tests/ -v
+
+      - name: Golden-path config check
+        env:
+          OPENCLAW_CHAT_MODEL: gpt-golden-path-test
+        run: python scripts/doctor.py

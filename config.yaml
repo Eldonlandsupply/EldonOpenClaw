@@ -1,36 +1,28 @@
 # ============================================================
-# OpenClaw non-secret configuration
-# Copy this file to config.yaml and edit as needed.
-# Secrets belong in .env only — never here.
+# EldonOpenClaw — config.yaml
+# Non-secrets only. Secrets live in .env / environment vars.
+# Syntax: ${VAR} or ${VAR:default}
 # ============================================================
 
-llm:
-  provider: "none"          # "openai" | "anthropic" | "none"
-  chat_model: "gpt-4o-mini" # ignored if provider = "none"
-  embedding_model: null     # null = embeddings disabled
+app:
+  env: ${OPENCLAW_ENV:development}
+  log_level: ${OPENCLAW_LOG_LEVEL:info}
 
-runtime:
-  tick_seconds: 10           # main loop interval
-  log_level: "INFO"          # DEBUG | INFO | WARNING | ERROR
-  data_dir: "./data"
-  dry_run: true              # SAFE DEFAULT: set false when ready
+llm:
+  chat_model: ${OPENCLAW_CHAT_MODEL}
+  embedding_model: ${OPENCLAW_EMBED_MODEL:}
+  # base_url is optional; leave blank for OpenAI default
+  base_url: ${OPENAI_BASE_URL:}
 
 connectors:
-  cli:
-    enabled: true
-  telegram:
-    enabled: false
+  cli: ${OPENCLAW_CONNECTOR_CLI:true}
+  telegram: ${OPENCLAW_CONNECTOR_TELEGRAM:false}
+  voice: ${OPENCLAW_CONNECTOR_VOICE:false}
+
+memory:
+  enabled: ${OPENCLAW_MEMORY_ENABLED:false}
+  vector_store: ${OPENCLAW_VECTOR_STORE:local}
+  vector_store_path: ${OPENCLAW_VECTOR_STORE_PATH:.data/vector_store}
 
 actions:
-  # Allowlist of action names the agent may execute.
-  # Any unlisted action is silently blocked.
-  allowlist:
-    - "echo"
-    - "memory_write"
-    - "memory_read"
-  require_confirm: false     # CLI will prompt before executing
-
-health:
-  enabled: true
-  host: "127.0.0.1"
-  port: 8080
+  require_confirmation: ${OPENCLAW_ACTION_CONFIRM:true}
