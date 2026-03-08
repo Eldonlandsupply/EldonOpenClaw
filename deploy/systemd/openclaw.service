@@ -1,6 +1,6 @@
 [Unit]
 Description=OpenClaw Agent Runtime
-Documentation=https://github.com/yourname/EldonOpenClaw
+Documentation=https://github.com/Eldonlandsupply/EldonOpenClaw
 After=network-online.target
 Wants=network-online.target
 
@@ -9,25 +9,27 @@ Type=simple
 User=openclaw
 Group=openclaw
 
-# EDIT THIS: set to your actual repo path
+# Edit this to your actual install path
 WorkingDirectory=/opt/openclaw
 
 # Secrets file — chmod 600, owned by openclaw
+# Create with: sudo cp .env.example /etc/openclaw/openclaw.env && sudo chmod 600 /etc/openclaw/openclaw.env
 EnvironmentFile=/etc/openclaw/openclaw.env
 
 ExecStart=/opt/openclaw/.venv/bin/python -m openclaw.main /opt/openclaw/config.yaml
 
-# Restart policy — crucial for 24/7 operation
+# 24/7 restart policy
 Restart=always
-RestartSec=3
-TimeoutStopSec=15
+RestartSec=5
+TimeoutStopSec=20
 
-# Logging — goes to journald automatically
+# Structured JSON logs go to journald automatically
+# View with: journalctl -u openclaw -f
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=openclaw
 
-# Hardening (optional but recommended)
+# Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

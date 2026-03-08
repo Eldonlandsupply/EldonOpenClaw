@@ -5,13 +5,55 @@ Fails loudly if misconfigured. Prints a redacted summary on boot.
 
 from __future__ import annotations
 
+import os
+import re
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import yaml
+from dotenv import load_dotenv
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# ── Env-var expansion ──────────────────────────────────────────────────────
+# Supports ${VAR} and ${VAR:default} tokens in config.yaml values.
+
+_ENV_VAR_RE = re.compile(r"\$\{([^}]+)\}")
+
+
+def _expand_value(value: str) -> str:
+    def replace(match: re.Match) -> str:
+        inner = match.group(1)
+        if ":" in inner:
+            var, default = inner.split(":", 1)
+            return os.getenv(var.strip(), default)
+        return os.getenv(inner.strip(), "")
+    return _ENV_VAR_RE.sub(replace, value)
+
+
+def _walk_expand(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        return {k: _walk_expand(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_walk_expand(v) for v in obj]
+    if isinstance(obj, str):
+        return _expand_value(obj)
+    return obj
+
+
+def _coerce_bools(obj: Any) -> Any:
+    """YAML env expansion produces strings; convert 'true'/'false' to bool."""
+    if isinstance(obj, dict):
+        return {k: _coerce_bools(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_coerce_bools(v) for v in obj]
+    if isinstance(obj, str):
+        if obj.lower() == "true":
+            return True
+        if obj.lower() == "false":
+            return False
+    return obj
 
 
 # ── Pydantic models for each YAML section ──────────────────────────────────
@@ -85,9 +127,22 @@ class HealthConfig:
 
 # ── Secrets from .env ──────────────────────────────────────────────────────
 
+def _find_env_file() -> str:
+    """Resolve .env relative to the repo root, not the working directory."""
+    candidates = [
+        Path(".env"),
+        Path(__file__).resolve().parent.parent.parent / ".env",
+        Path("/etc/openclaw/openclaw.env"),
+    ]
+    for p in candidates:
+        if p.exists():
+            return str(p)
+    return ".env"  # fallback; pydantic-settings won't error if missing
+
+
 class Secrets(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_find_env_file(),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -116,6 +171,9 @@ class AppConfig:
         self._validate()
 
     def _load_yaml(self, path: str) -> None:
+        # Load .env first so ${VAR} expansion below sees the values
+        load_dotenv(override=False)
+
         p = Path(path)
         if not p.exists():
             print(
@@ -127,6 +185,9 @@ class AppConfig:
 
         with p.open() as f:
             raw = yaml.safe_load(f) or {}
+
+        # Expand ${VAR} / ${VAR:default} tokens, then coerce string bools
+        raw = _coerce_bools(_walk_expand(raw))
 
         self.llm = LLMConfig(**(raw.get("llm") or {}))
         self.runtime = RuntimeConfig(**(raw.get("runtime") or {}))
