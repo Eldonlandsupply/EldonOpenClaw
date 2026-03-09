@@ -79,3 +79,33 @@ def test_notifier_dedup_suppression():
     n.send("info", message="hello")
     result = n.send("info", message="hello")
     assert result is False
+
+
+# ── send_raw tests ─────────────────────────────────────────────────────────
+
+def test_notifier_send_raw_success():
+    from src.openclaw.messaging.notifier import Notifier
+    n = Notifier.from_config(make_config())
+    result = n.send_raw("Direct message", recipient=RECIPIENT)
+    assert result is True
+
+
+def test_notifier_send_raw_blocked_when_disabled():
+    from src.openclaw.messaging.notifier import Notifier
+    n = Notifier.from_config(make_config(enabled=False))
+    result = n.send_raw("Direct message", recipient=RECIPIENT)
+    assert result is False
+
+
+def test_notifier_send_raw_no_recipient_no_allowlist():
+    from src.openclaw.messaging.notifier import Notifier
+    n = Notifier.from_config(make_config(allowed_recipients=[]))
+    result = n.send_raw("Direct message")
+    assert result is False
+
+
+def test_notifier_send_raw_uses_first_allowlist_recipient():
+    from src.openclaw.messaging.notifier import Notifier
+    n = Notifier.from_config(make_config())
+    result = n.send_raw("Hello")
+    assert result is True

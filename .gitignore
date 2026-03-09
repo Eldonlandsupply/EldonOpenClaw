@@ -1,7 +1,41 @@
-data/*.db
-.venv/
+# Secrets — never commit
+.env
+
+# Python
 __pycache__/
 *.pyc
-*.log
-.env
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Data / runtime artifacts
+data/
 .data/
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+logs/
+
+# Editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/

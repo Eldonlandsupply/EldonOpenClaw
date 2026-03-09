@@ -1,11 +1,14 @@
 """
-Minimal async HTTP health endpoint.
-Returns JSON: {"status": "ok"|"degraded", "uptime_s": N, "last_tick": "...", "version": "..."}
+Async HTTP health endpoints.
+
+Endpoints:
+  GET /health  — full status JSON (used by monitoring, curl checks)
+  GET /ready   — 200 if ready to serve, 503 if not (systemd / load balancer probe)
+  GET /ping    — always 200 "pong" (cheap liveness check)
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import time
 from datetime import datetime, timezone
@@ -18,11 +21,10 @@ from openclaw.logging import get_logger
 
 logger = get_logger(__name__)
 
-# Shared mutable state updated by the main loop
 _start_time: float = time.monotonic()
 _last_tick: Optional[str] = None
 _degraded: bool = False
-_max_stale_seconds: int = 60  # health goes degraded if loop hasn't ticked in this long
+_max_stale_seconds: int = 60
 
 
 def record_tick() -> None:
@@ -36,37 +38,56 @@ def mark_degraded(reason: str = "") -> None:
     logger.warning("health marked degraded", extra={"reason": reason})
 
 
-async def _handle_health(request: web.Request) -> web.Response:  # noqa: ARG001
-    uptime = int(time.monotonic() - _start_time)
-
-    # Auto-degrade if main loop has stalled
+def _compute_status() -> tuple[str, int]:
+    """Return (status_string, http_status_code)."""
     stale = False
     if _last_tick is not None:
-        from datetime import datetime as _dt
-        last = _dt.fromisoformat(_last_tick.replace("Z", "+00:00"))
+        last = datetime.fromisoformat(_last_tick.replace("Z", "+00:00"))
         age = (datetime.now(timezone.utc) - last).total_seconds()
         if age > _max_stale_seconds:
             stale = True
-
     status = "degraded" if (_degraded or stale) else "ok"
+    code = 200 if status == "ok" else 503
+    return status, code
+
+
+async def _handle_health(request: web.Request) -> web.Response:  # noqa: ARG001
+    status, code = _compute_status()
     payload = {
         "status": status,
-        "uptime_s": uptime,
+        "uptime_s": int(time.monotonic() - _start_time),
         "last_tick": _last_tick,
         "version": __version__,
     }
     return web.Response(
         text=json.dumps(payload),
         content_type="application/json",
-        status=200 if status == "ok" else 503,
+        status=code,
     )
+
+
+async def _handle_ready(request: web.Request) -> web.Response:  # noqa: ARG001
+    """Readiness probe — 200 when the main loop has ticked at least once."""
+    _, code = _compute_status()
+    body = "ready" if code == 200 else "not ready"
+    return web.Response(text=body, status=code)
+
+
+async def _handle_ping(request: web.Request) -> web.Response:  # noqa: ARG001
+    """Liveness probe — always 200 as long as the process is alive."""
+    return web.Response(text="pong", status=200)
 
 
 async def start_health_server(host: str, port: int) -> None:
     app = web.Application()
     app.router.add_get("/health", _handle_health)
+    app.router.add_get("/ready", _handle_ready)
+    app.router.add_get("/ping", _handle_ping)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, host, port)
     await site.start()
-    logger.info("health server started", extra={"host": host, "port": port})
+    logger.info(
+        "health server started",
+        extra={"host": host, "port": port, "endpoints": ["/health", "/ready", "/ping"]},
+    )
