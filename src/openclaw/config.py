@@ -1,89 +1,108 @@
 """
-Centralized config: secrets from .env, non-secrets from config.yaml.
+Centralized config: secrets from .env / environment, non-secrets from config.yaml.
 Fails loudly if misconfigured. Prints a redacted summary on boot.
+
+config.yaml supports ${VAR} and ${VAR:default} substitution from environment.
 """
 
 from __future__ import annotations
 
+import os
+import re
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import yaml
-from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# ── Environment variable expansion ────────────────────────────────────────
 
-# ── Pydantic models for each YAML section ──────────────────────────────────
+_ENV_TOKEN = re.compile(r"^\$\{([^}]+)\}$")
+
+
+def _expand(value: Any) -> Any:
+    """Recursively expand ${VAR} and ${VAR:default} tokens in YAML values."""
+    if isinstance(value, dict):
+        return {k: _expand(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_expand(v) for v in value]
+    if isinstance(value, str):
+        m = _ENV_TOKEN.match(value.strip())
+        if m:
+            inner = m.group(1)
+            if ":" in inner:
+                var, default = inner.split(":", 1)
+                return os.environ.get(var.strip(), default)
+            return os.environ.get(inner.strip(), "")
+    return value
+
+
+# ── Config section classes ─────────────────────────────────────────────────
 
 class LLMConfig:
-    provider: str = "none"
-    chat_model: str = "gpt-4o-mini"
-    embedding_model: Optional[str] = None
-
-    def __init__(self, **data):
-        for k, v in data.items():
-            setattr(self, k, v)
+    def __init__(self, **data: Any) -> None:
+        self.provider = str(data.get("provider", "none"))
+        self.chat_model = str(data.get("chat_model", "gpt-4o-mini"))
+        raw_embed = data.get("embedding_model")
+        self.embedding_model = str(raw_embed) if raw_embed else None
 
 
 class RuntimeConfig:
-    tick_seconds: int = 10
-    log_level: str = "INFO"
-    data_dir: str = "./data"
-    dry_run: bool = True
-
-    def __init__(self, **data):
-        for k, v in data.items():
-            setattr(self, k, v)
+    def __init__(self, **data: Any) -> None:
+        self.tick_seconds = int(data.get("tick_seconds", 10))
+        self.log_level = str(data.get("log_level", "INFO")).upper()
+        self.data_dir = str(data.get("data_dir", "./data"))
+        raw_dry = data.get("dry_run", True)
+        if isinstance(raw_dry, str):
+            self.dry_run = raw_dry.lower() not in ("false", "0", "no")
+        else:
+            self.dry_run = bool(raw_dry)
 
 
 class ConnectorCliConfig:
-    enabled: bool = True
-
-    def __init__(self, **data):
-        for k, v in data.items():
-            setattr(self, k, v)
+    def __init__(self, **data: Any) -> None:
+        raw = data.get("enabled", True)
+        self.enabled = raw if isinstance(raw, bool) else str(raw).lower() not in ("false", "0", "no")
 
 
 class ConnectorTelegramConfig:
-    enabled: bool = False
-
-    def __init__(self, **data):
-        for k, v in data.items():
-            setattr(self, k, v)
+    def __init__(self, **data: Any) -> None:
+        raw = data.get("enabled", False)
+        self.enabled = raw if isinstance(raw, bool) else str(raw).lower() in ("true", "1", "yes")
 
 
 class ConnectorsConfig:
-    cli: ConnectorCliConfig = ConnectorCliConfig()
-    telegram: ConnectorTelegramConfig = ConnectorTelegramConfig()
+    def __init__(self, **data: Any) -> None:
+        cli_raw = data.get("cli", {})
+        if isinstance(cli_raw, (bool, str)):
+            cli_raw = {"enabled": cli_raw}
+        self.cli = ConnectorCliConfig(**(cli_raw or {}))
 
-    def __init__(self, **data):
-        if "cli" in data:
-            self.cli = ConnectorCliConfig(**(data["cli"] or {}))
-        if "telegram" in data:
-            self.telegram = ConnectorTelegramConfig(**(data["telegram"] or {}))
+        tg_raw = data.get("telegram", {})
+        if isinstance(tg_raw, (bool, str)):
+            tg_raw = {"enabled": tg_raw}
+        self.telegram = ConnectorTelegramConfig(**(tg_raw or {}))
 
 
 class ActionsConfig:
-    allowlist: list[str] = ["echo"]
-    require_confirm: bool = False
-
-    def __init__(self, **data):
-        for k, v in data.items():
-            setattr(self, k, v)
+    def __init__(self, **data: Any) -> None:
+        self.allowlist = list(data.get("allowlist", ["echo"]))
+        raw = data.get("require_confirm", data.get("require_confirmation", False))
+        if isinstance(raw, str):
+            self.require_confirm = raw.lower() in ("true", "1", "yes")
+        else:
+            self.require_confirm = bool(raw)
 
 
 class HealthConfig:
-    enabled: bool = True
-    host: str = "127.0.0.1"
-    port: int = 8080
-
-    def __init__(self, **data):
-        for k, v in data.items():
-            setattr(self, k, v)
+    def __init__(self, **data: Any) -> None:
+        self.enabled = bool(data.get("enabled", True))
+        self.host = str(data.get("host", "127.0.0.1"))
+        self.port = int(data.get("port", 8080))
 
 
-# ── Secrets from .env ──────────────────────────────────────────────────────
+# ── Secrets from environment / .env ───────────────────────────────────────
 
 class Secrets(BaseSettings):
     model_config = SettingsConfigDict(
@@ -93,8 +112,12 @@ class Secrets(BaseSettings):
     )
 
     openai_api_key: Optional[str] = None
+    openrouter_api_key: Optional[str] = None
     telegram_bot_token: Optional[str] = None
-    telegram_allowed_chat_ids: Optional[str] = None  # raw comma-separated string
+    telegram_allowed_chat_ids: Optional[str] = None
+    gmail_user: Optional[str] = None
+    gmail_app_password: Optional[str] = None
+    notification_email: Optional[str] = None
     sqlite_path: str = "./data/openclaw.db"
 
     @property
@@ -104,12 +127,18 @@ class Secrets(BaseSettings):
         return [int(x.strip()) for x in self.telegram_allowed_chat_ids.split(",") if x.strip()]
 
 
+# ── Valid sets ─────────────────────────────────────────────────────────────
+
+_VALID_PROVIDERS: frozenset[str] = frozenset({"openai", "anthropic", "openrouter", "none"})
+_VALID_LOG_LEVELS: frozenset[str] = frozenset({"DEBUG", "INFO", "WARNING", "ERROR"})
+
+
 # ── Merged app config ──────────────────────────────────────────────────────
 
 class AppConfig:
     """Single object holding all config. Created once at startup."""
 
-    def __init__(self, yaml_path: str = "config.yaml"):
+    def __init__(self, yaml_path: str = "config.yaml") -> None:
         self.secrets = Secrets()
         self._yaml_path = yaml_path
         self._load_yaml(yaml_path)
@@ -120,35 +149,39 @@ class AppConfig:
         if not p.exists():
             print(
                 f"FATAL: config file not found: {path}\n"
-                f"       cp config.yaml.example config.yaml  # then edit it",
+                "       cp config.yaml.example config.yaml  # then edit it",
                 file=sys.stderr,
             )
             sys.exit(1)
 
-        with p.open() as f:
+        with p.open(encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
 
-        self.llm = LLMConfig(**(raw.get("llm") or {}))
-        self.runtime = RuntimeConfig(**(raw.get("runtime") or {}))
-        self.connectors = ConnectorsConfig(**(raw.get("connectors") or {}))
-        self.actions = ActionsConfig(**(raw.get("actions") or {}))
-        self.health = HealthConfig(**(raw.get("health") or {}))
+        expanded = _expand(raw)
+
+        self.llm = LLMConfig(**(expanded.get("llm") or {}))
+        self.runtime = RuntimeConfig(**(expanded.get("runtime") or {}))
+        self.connectors = ConnectorsConfig(**(expanded.get("connectors") or {}))
+        self.actions = ActionsConfig(**(expanded.get("actions") or {}))
+        self.health = HealthConfig(**(expanded.get("health") or {}))
 
     def _validate(self) -> None:
-        valid_providers = {"openai", "anthropic", "none"}
-        if self.llm.provider not in valid_providers:
-            self._fatal(f"llm.provider must be one of {valid_providers}, got: {self.llm.provider!r}")
-
-        valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR"}
-        if self.runtime.log_level.upper() not in valid_levels:
-            self._fatal(f"runtime.log_level must be one of {valid_levels}")
-
+        if self.llm.provider not in _VALID_PROVIDERS:
+            self._fatal(
+                f"llm.provider must be one of {sorted(_VALID_PROVIDERS)}, "
+                f"got: {self.llm.provider!r}"
+            )
+        if self.runtime.log_level not in _VALID_LOG_LEVELS:
+            self._fatal(
+                f"runtime.log_level must be one of {sorted(_VALID_LOG_LEVELS)}, "
+                f"got: {self.runtime.log_level!r}"
+            )
         if self.llm.provider == "openai" and not self.secrets.openai_api_key:
-            self._fatal("llm.provider=openai but OPENAI_API_KEY is not set in .env")
-
+            self._fatal("llm.provider=openai but OPENAI_API_KEY is not set")
+        if self.llm.provider == "openrouter" and not self.secrets.openrouter_api_key:
+            self._fatal("llm.provider=openrouter but OPENROUTER_API_KEY is not set")
         if self.connectors.telegram.enabled and not self.secrets.telegram_bot_token:
-            self._fatal("connectors.telegram.enabled=true but TELEGRAM_BOT_TOKEN is not set in .env")
-
+            self._fatal("connectors.telegram.enabled=true but TELEGRAM_BOT_TOKEN is not set")
         Path(self.runtime.data_dir).mkdir(parents=True, exist_ok=True)
 
     @staticmethod
@@ -157,9 +190,12 @@ class AppConfig:
         sys.exit(1)
 
     def summary(self) -> dict:
-        """Redacted summary safe to log at startup."""
         return {
-            "llm": {"provider": self.llm.provider, "chat_model": self.llm.chat_model},
+            "llm": {
+                "provider": self.llm.provider,
+                "chat_model": self.llm.chat_model,
+                "embedding_model": self.llm.embedding_model,
+            },
             "runtime": {
                 "tick_seconds": self.runtime.tick_seconds,
                 "log_level": self.runtime.log_level,
@@ -181,14 +217,17 @@ class AppConfig:
             },
             "secrets": {
                 "openai_api_key": "SET" if self.secrets.openai_api_key else "NOT SET",
+                "openrouter_api_key": "SET" if self.secrets.openrouter_api_key else "NOT SET",
                 "telegram_bot_token": "SET" if self.secrets.telegram_bot_token else "NOT SET",
+                "gmail_user": self.secrets.gmail_user or "NOT SET",
+                "notification_email": self.secrets.notification_email or "NOT SET",
                 "sqlite_path": self.secrets.sqlite_path,
             },
         }
 
 
 # ── Module-level singleton ─────────────────────────────────────────────────
-# Callers: from openclaw.config import get_config
+
 _config: Optional[AppConfig] = None
 
 

@@ -1,36 +1,36 @@
 # ============================================================
-# OpenClaw non-secret configuration
-# Copy this file to config.yaml and edit as needed.
-# Secrets belong in .env only — never here.
+# EldonOpenClaw — config.yaml.example
+# Copy to config.yaml. Non-secrets only — secrets go in .env.
+# Supports ${VAR} and ${VAR:default} env substitution.
 # ============================================================
 
 llm:
-  provider: "none"          # "openai" | "anthropic" | "none"
-  chat_model: "gpt-4o-mini" # ignored if provider = "none"
-  embedding_model: null     # null = embeddings disabled
+  # openai | openrouter | anthropic | none
+  provider: ${LLM_PROVIDER:openrouter}
+  chat_model: ${LLM_CHAT_MODEL:openai/gpt-4o-mini}
+  embedding_model: ${LLM_EMBED_MODEL:}
 
 runtime:
-  tick_seconds: 10           # main loop interval
-  log_level: "INFO"          # DEBUG | INFO | WARNING | ERROR
-  data_dir: "./data"
-  dry_run: true              # SAFE DEFAULT: set false when ready
+  tick_seconds: ${TICK_SECONDS:10}
+  log_level: ${LOG_LEVEL:INFO}
+  data_dir: ${DATA_DIR:./data}
+  # IMPORTANT: set to false when ready for live operation
+  dry_run: ${DRY_RUN:true}
 
 connectors:
   cli:
-    enabled: true
+    enabled: ${CONNECTOR_CLI:true}
   telegram:
-    enabled: false
+    enabled: ${CONNECTOR_TELEGRAM:false}
 
 actions:
-  # Allowlist of action names the agent may execute.
-  # Any unlisted action is silently blocked.
+  require_confirm: ${ACTION_CONFIRM:false}
   allowlist:
-    - "echo"
-    - "memory_write"
-    - "memory_read"
-  require_confirm: false     # CLI will prompt before executing
+    - echo
+    - memory_write
+    - memory_read
 
 health:
   enabled: true
-  host: "127.0.0.1"
-  port: 8080
+  host: ${HEALTH_HOST:0.0.0.0}
+  port: ${HEALTH_PORT:8080}

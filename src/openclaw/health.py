@@ -5,7 +5,6 @@ Returns JSON: {"status": "ok"|"degraded", "uptime_s": N, "last_tick": "...", "ve
 
 from __future__ import annotations
 
-import asyncio
 import json
 import time
 from datetime import datetime, timezone
@@ -18,11 +17,10 @@ from openclaw.logging import get_logger
 
 logger = get_logger(__name__)
 
-# Shared mutable state updated by the main loop
 _start_time: float = time.monotonic()
 _last_tick: Optional[str] = None
 _degraded: bool = False
-_max_stale_seconds: int = 60  # health goes degraded if loop hasn't ticked in this long
+_max_stale_seconds: int = 60
 
 
 def record_tick() -> None:
@@ -39,11 +37,9 @@ def mark_degraded(reason: str = "") -> None:
 async def _handle_health(request: web.Request) -> web.Response:  # noqa: ARG001
     uptime = int(time.monotonic() - _start_time)
 
-    # Auto-degrade if main loop has stalled
     stale = False
     if _last_tick is not None:
-        from datetime import datetime as _dt
-        last = _dt.fromisoformat(_last_tick.replace("Z", "+00:00"))
+        last = datetime.fromisoformat(_last_tick.replace("Z", "+00:00"))
         age = (datetime.now(timezone.utc) - last).total_seconds()
         if age > _max_stale_seconds:
             stale = True

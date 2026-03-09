@@ -1,6 +1,6 @@
 """
 SQLite-backed memory store. Thread-safe via asyncio.to_thread.
-Schema is intentionally minimal: key-value + append-log.
+Schema: key-value store + append-only event log with index and auto-trim.
 """
 
 from __future__ import annotations
@@ -15,11 +15,16 @@ from openclaw.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Keep at most this many event_log rows; trim runs automatically after inserts
+_EVENT_LOG_MAX_ROWS = 10_000
+_EVENT_LOG_TRIM_TO = 8_000
+
 
 class SQLiteMemory:
-    def __init__(self, db_path: str = "./data/openclaw.db"):
+    def __init__(self, db_path: str = "./data/openclaw.db") -> None:
         self._path = db_path
         self._conn: Optional[sqlite3.Connection] = None
+        self._event_count = 0  # approximate, avoids COUNT(*) on every insert
 
     async def init(self) -> None:
         Path(self._path).parent.mkdir(parents=True, exist_ok=True)
@@ -29,6 +34,7 @@ class SQLiteMemory:
     def _sync_init(self) -> None:
         self._conn = sqlite3.connect(self._path, check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA synchronous=NORMAL")  # safe with WAL, faster than FULL
         self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS kv (
@@ -49,7 +55,15 @@ class SQLiteMemory:
             )
             """
         )
+        # Index for fast recent-events queries and trim operations
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_event_log_id ON event_log(id DESC)"
+        )
         self._conn.commit()
+
+        # Seed approximate count to avoid COUNT(*) at startup
+        row = self._conn.execute("SELECT COUNT(*) FROM event_log").fetchone()
+        self._event_count = row[0] if row else 0
 
     # ── KV store ──────────────────────────────────────────────────────────
 
@@ -83,12 +97,7 @@ class SQLiteMemory:
 
     # ── Event log ─────────────────────────────────────────────────────────
 
-    async def log_event(
-        self,
-        source: str,
-        action: str,
-        content: str,
-    ) -> None:
+    async def log_event(self, source: str, action: str, content: str) -> None:
         now = datetime.now(timezone.utc).isoformat()
         await asyncio.to_thread(self._sync_log, now, source, action, content)
 
@@ -99,6 +108,29 @@ class SQLiteMemory:
             (now, source, action, content),
         )
         self._conn.commit()
+
+        self._event_count += 1
+        if self._event_count > _EVENT_LOG_MAX_ROWS:
+            self._sync_trim()
+
+    def _sync_trim(self) -> None:
+        """Delete oldest rows, keeping only the most recent _EVENT_LOG_TRIM_TO."""
+        assert self._conn
+        self._conn.execute(
+            """
+            DELETE FROM event_log WHERE id NOT IN (
+                SELECT id FROM event_log ORDER BY id DESC LIMIT ?
+            )
+            """,
+            (_EVENT_LOG_TRIM_TO,),
+        )
+        self._conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+        self._conn.commit()
+        self._event_count = _EVENT_LOG_TRIM_TO
+        logger.info(
+            "event_log trimmed",
+            extra={"kept": _EVENT_LOG_TRIM_TO},
+        )
 
     async def recent_events(self, limit: int = 20) -> list[dict]:
         return await asyncio.to_thread(self._sync_recent, limit)
