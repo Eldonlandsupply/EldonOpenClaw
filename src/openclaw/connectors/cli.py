@@ -14,13 +14,15 @@ from openclaw.logging import get_logger
 
 logger = get_logger(__name__)
 
+_SENTINEL = object()  # poison-pill to unblock messages() on shutdown
+
 
 class CLIConnector(BaseConnector):
     name = "cli"
 
     def __init__(self, require_confirm: bool = False) -> None:
         self._require_confirm = require_confirm
-        self._queue: asyncio.Queue[Message] = asyncio.Queue()
+        self._queue: asyncio.Queue = asyncio.Queue()
         self._running = False
         self._loop: asyncio.AbstractEventLoop | None = None
 
@@ -31,7 +33,6 @@ class CLIConnector(BaseConnector):
         logger.info("CLI connector started — type commands and press Enter")
 
     def _read_stdin(self) -> None:
-        """Blocking stdin reader, runs in a thread pool executor."""
         assert self._loop is not None
         try:
             while self._running:
@@ -52,14 +53,23 @@ class CLIConnector(BaseConnector):
                 )
         except (EOFError, OSError):
             pass
+        finally:
+            # Always send sentinel so messages() can exit cleanly
+            if self._loop and not self._loop.is_closed():
+                self._loop.call_soon_threadsafe(self._queue.put_nowait, _SENTINEL)
 
     async def messages(self) -> AsyncIterator[Message]:
         while True:
-            msg = await self._queue.get()
-            yield msg
+            item = await self._queue.get()
+            if item is _SENTINEL:
+                return
+            yield item
 
     async def send(self, chat_id: str | None, text: str) -> None:  # noqa: ARG002
         print(f"[openclaw] {text}")
 
     async def stop(self) -> None:
         self._running = False
+        # Unblock any waiting messages() call if the stdin thread already exited
+        if self._loop and not self._loop.is_closed():
+            self._loop.call_soon_threadsafe(self._queue.put_nowait, _SENTINEL)

@@ -56,6 +56,10 @@ async def _message_loop(
         if _shutdown.is_set():
             break
 
+        # Guard: skip empty messages (shouldn't happen but be safe)
+        if not msg.text:
+            continue
+
         logger.info(
             "message received",
             extra={"connector": connector.name, "text": msg.text},
@@ -66,13 +70,44 @@ async def _message_loop(
         action_name = parts[0].lower()
         args = parts[1] if len(parts) > 1 else ""
 
+        # Special-case memory_read: dispatch to memory layer directly
+        if action_name == "memory_read" and registry.is_allowed("memory_read"):
+            value = await memory.get(args.strip()) if args.strip() else None
+            reply = value if value is not None else f"(no value stored for key: {args.strip()!r})"
+            await connector.send(msg.chat_id, str(reply))
+            await memory.log_event(
+                source=connector.name,
+                action=action_name,
+                content=json.dumps({"args": args, "found": value is not None}),
+            )
+            continue
+
+        # Special-case memory_write: key=value syntax
+        if action_name == "memory_write" and registry.is_allowed("memory_write"):
+            if "=" in args:
+                key, _, val = args.partition("=")
+                await memory.set(key.strip(), val.strip())
+                reply = f"stored: {key.strip()!r}"
+            else:
+                reply = "ERROR: memory_write requires key=value syntax"
+            await connector.send(msg.chat_id, reply)
+            await memory.log_event(
+                source=connector.name,
+                action=action_name,
+                content=json.dumps({"args": args}),
+            )
+            continue
+
         result = await registry.dispatch(action_name, args)
 
-        # Persist to event log
         await memory.log_event(
             source=connector.name,
             action=action_name,
-            content=json.dumps({"args": args, "success": result.success, "output": str(result.output)}),
+            content=json.dumps({
+                "args": args,
+                "success": result.success,
+                "output": str(result.output),
+            }),
         )
 
         reply = result.output if result.success else f"ERROR: {result.error}"
@@ -119,7 +154,6 @@ async def run(yaml_path: str = "config.yaml") -> None:
         tasks.append(asyncio.create_task(_message_loop(cli, registry, memory)))
         logger.info("CLI connector active")
 
-    # OPEN_ITEM: Telegram connector — enabled behind feature flag
     if cfg.connectors.telegram.enabled:
         logger.warning(
             "OPEN_ITEM: Telegram connector is enabled in config but not yet implemented. "

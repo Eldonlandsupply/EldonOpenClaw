@@ -1,0 +1,2 @@
+[console_scripts]
+openclaw = openclaw.main:cli_entry
