@@ -46,7 +46,7 @@ class SQLiteMemory:
         self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS kv (
-                key TEXT PRIMARY KEY,
+                key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
@@ -55,16 +55,20 @@ class SQLiteMemory:
         self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS event_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT NOT NULL,
-                source TEXT,
-                action TEXT,
-                content TEXT
+                source    TEXT,
+                action    TEXT,
+                content   TEXT
             )
             """
         )
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_event_log_id ON event_log(id DESC)"
+        )
+        # Index for filtering events by action name (used by search_events)
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_event_log_action ON event_log(action)"
         )
         self._conn.commit()
         row = self._conn.execute("SELECT COUNT(*) FROM event_log").fetchone()
@@ -100,6 +104,21 @@ class SQLiteMemory:
         conn.execute("DELETE FROM kv WHERE key = ?", (key,))
         conn.commit()
 
+    async def list_keys(self, prefix: str = "") -> list[str]:
+        """Return all KV keys, optionally filtered by prefix."""
+        return await asyncio.to_thread(self._sync_list_keys, prefix)
+
+    def _sync_list_keys(self, prefix: str) -> list[str]:
+        conn = _require_init(self._conn)
+        if prefix:
+            rows = conn.execute(
+                "SELECT key FROM kv WHERE key LIKE ? ORDER BY key",
+                (prefix + "%",),
+            ).fetchall()
+        else:
+            rows = conn.execute("SELECT key FROM kv ORDER BY key").fetchall()
+        return [r[0] for r in rows]
+
     # ── Event log ─────────────────────────────────────────────────────────
 
     async def log_event(self, source: str, action: str, content: str) -> None:
@@ -123,12 +142,14 @@ class SQLiteMemory:
             "(SELECT id FROM event_log ORDER BY id DESC LIMIT ?)",
             (_EVENT_LOG_TRIM_TO,),
         )
-        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
         conn.commit()
+        # Checkpoint outside any transaction
+        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
         self._event_count = _EVENT_LOG_TRIM_TO
         logger.info("event_log trimmed", extra={"kept": _EVENT_LOG_TRIM_TO})
 
     async def recent_events(self, limit: int = 20) -> list[dict]:
+        """Return the most recent N events, newest first."""
         return await asyncio.to_thread(self._sync_recent, limit)
 
     def _sync_recent(self, limit: int) -> list[dict]:
@@ -137,6 +158,42 @@ class SQLiteMemory:
             "SELECT timestamp, source, action, content "
             "FROM event_log ORDER BY id DESC LIMIT ?",
             (limit,),
+        ).fetchall()
+        return [
+            {"timestamp": r[0], "source": r[1], "action": r[2], "content": r[3]}
+            for r in rows
+        ]
+
+    async def search_events(
+        self,
+        action: str | None = None,
+        source: str | None = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Filter event log by action name and/or source connector."""
+        return await asyncio.to_thread(self._sync_search, action, source, limit)
+
+    def _sync_search(
+        self,
+        action: str | None,
+        source: str | None,
+        limit: int,
+    ) -> list[dict]:
+        conn = _require_init(self._conn)
+        clauses: list[str] = []
+        params: list[object] = []
+        if action:
+            clauses.append("action = ?")
+            params.append(action)
+        if source:
+            clauses.append("source = ?")
+            params.append(source)
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        params.append(limit)
+        rows = conn.execute(
+            f"SELECT timestamp, source, action, content "
+            f"FROM event_log {where} ORDER BY id DESC LIMIT ?",
+            params,
         ).fetchall()
         return [
             {"timestamp": r[0], "source": r[1], "action": r[2], "content": r[3]}
