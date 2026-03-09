@@ -6,8 +6,9 @@ Boot sequence:
   2. Configure structured logging
   3. Init memory
   4. Start health server
-  5. Start connectors
-  6. Run main tick loop + message dispatch loop
+  5. Init chat client
+  6. Start connectors
+  7. Run main tick loop + message dispatch loop
 
 Signals:
   SIGINT / SIGTERM  — graceful shutdown
@@ -24,6 +25,7 @@ from typing import Optional
 
 from openclaw import __version__
 from openclaw.actions.registry import ActionRegistry
+from openclaw.chat.client import ChatClient
 from openclaw.config import get_config, reset_config
 from openclaw.connectors.cli import CLIConnector
 from openclaw.health import record_tick, start_health_server
@@ -58,8 +60,9 @@ async def _message_loop(
     connector: CLIConnector,
     registry: ActionRegistry,
     memory: SQLiteMemory,
+    chat_client: ChatClient,
 ) -> None:
-    """Read messages from a connector, parse and dispatch actions."""
+    """Read messages from a connector, dispatch actions or send to LLM."""
     async for msg in connector.messages():
         if _shutdown.is_set():
             break
@@ -76,7 +79,7 @@ async def _message_loop(
         action_name = parts[0].lower()
         args = parts[1] if len(parts) > 1 else ""
 
-        # memory_read: delegate to memory layer directly
+        # ── built-in: memory_read ─────────────────────────────────────────
         if action_name == "memory_read" and registry.is_allowed("memory_read"):
             key = args.strip()
             if key:
@@ -89,11 +92,11 @@ async def _message_loop(
             await memory.log_event(
                 source=connector.name,
                 action=action_name,
-                content=json.dumps({"key": args.strip(), "found": key != "" and value is not None}),
+                content=json.dumps({"key": args.strip()}),
             )
             continue
 
-        # memory_write: key=value syntax
+        # ── built-in: memory_write ────────────────────────────────────────
         if action_name == "memory_write" and registry.is_allowed("memory_write"):
             if "=" in args:
                 key, _, val = args.partition("=")
@@ -109,20 +112,36 @@ async def _message_loop(
             )
             continue
 
-        result = await registry.dispatch(action_name, args)
+        # ── built-in: /reset — clear chat history ─────────────────────────
+        if msg.text.strip().lower() in ("/reset", "reset"):
+            chat_client.reset()
+            await connector.send(msg.chat_id, "Conversation history cleared.")
+            continue
 
+        # ── registered actions (allowlisted) ─────────────────────────────
+        if registry.is_allowed(action_name):
+            result = await registry.dispatch(action_name, args)
+            await memory.log_event(
+                source=connector.name,
+                action=action_name,
+                content=json.dumps({
+                    "args": args,
+                    "success": result.success,
+                    "output": str(result.output),
+                }),
+            )
+            reply = result.output if result.success else f"ERROR: {result.error}"
+            await connector.send(msg.chat_id, str(reply))
+            continue
+
+        # ── LLM chat fallback ─────────────────────────────────────────────
+        reply = await chat_client.chat(msg.text)
         await memory.log_event(
             source=connector.name,
-            action=action_name,
-            content=json.dumps({
-                "args": args,
-                "success": result.success,
-                "output": str(result.output),
-            }),
+            action="chat",
+            content=json.dumps({"input": msg.text, "reply": reply[:200]}),
         )
-
-        reply = result.output if result.success else f"ERROR: {result.error}"
-        await connector.send(msg.chat_id, str(reply))
+        await connector.send(msg.chat_id, reply)
 
 
 async def run(yaml_path: str = "config.yaml") -> None:
@@ -150,6 +169,9 @@ async def run(yaml_path: str = "config.yaml") -> None:
         dry_run=cfg.runtime.dry_run,
     )
 
+    # ── Chat client ───────────────────────────────────────────────────────
+    chat_client = ChatClient(cfg)
+
     # ── Health server ─────────────────────────────────────────────────────
     if cfg.health.enabled:
         await start_health_server(cfg.health.host, cfg.health.port)
@@ -164,10 +186,14 @@ async def run(yaml_path: str = "config.yaml") -> None:
         cli = CLIConnector(require_confirm=cfg.actions.require_confirm)
         await cli.start()
         connectors.append(cli)
-        tasks.append(asyncio.create_task(_message_loop(cli, registry, memory)))
+        tasks.append(asyncio.create_task(_message_loop(cli, registry, memory, chat_client)))
         logger.info(
             "CLI connector active",
-            extra={"allowed_actions": registry.list_allowed()},
+            extra={
+                "allowed_actions": registry.list_allowed(),
+                "llm_provider": cfg.llm.provider,
+                "chat_model": cfg.llm.chat_model,
+            },
         )
 
     if cfg.connectors.telegram.enabled:
@@ -176,14 +202,13 @@ async def run(yaml_path: str = "config.yaml") -> None:
             "Install openclaw[telegram] and wire TelegramConnector."
         )
 
-    logger.info("openclaw running — Ctrl+C to stop")
+    logger.info("openclaw running — Ctrl+C to stop | type /reset to clear history")
 
     # ── Signal handling ───────────────────────────────────────────────────
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         loop.add_signal_handler(sig, _handle_signal, sig)
 
-    # Wait for shutdown or reload signal
     done, _ = await asyncio.wait(
         [
             asyncio.create_task(_shutdown.wait()),
@@ -205,7 +230,6 @@ async def run(yaml_path: str = "config.yaml") -> None:
     await memory.close()
     logger.info("openclaw stopped cleanly")
 
-    # If this was a reload, re-enter run() with fresh config
     if not _shutdown.is_set():
         reset_config()
         await run(yaml_path)
