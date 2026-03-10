@@ -23,18 +23,22 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install -e .
-          pip install shapely lxml
+          pip install ruff shapely lxml
 
       - name: Lint (ruff)
-        run: |
-          pip install ruff
-          ruff check src/ tests/ main.py scripts/
+        run: ruff check src/ tests/ main.py scripts/
 
       - name: Run tests
+        env:
+          PYTHONPATH: src
         run: pytest tests/ -v
+
+      - name: Run ingest tests
+        env:
+          PYTHONPATH: src
+        run: pytest src/ingest/tests/ -v
 
       - name: Golden-path config check
         env:
-          YOUR_CHAT_MODEL: gpt-golden-path-test
+          OPENCLAW_CHAT_MODEL: gpt-golden-path-test
         run: python scripts/doctor.py

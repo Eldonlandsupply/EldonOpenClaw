@@ -113,8 +113,7 @@ class TestExtractor:
         except (ZipSlipError, NoKMLError):
             pass  # either error is acceptable
 
-        # If /tmp/evil.txt existed before, we can't assert on it.
-        # The key assertion: nothing was written outside extract_dir.
+        # best-effort: verify nothing was written outside extract_dir
 
     def test_no_kml_in_archive(self, tmp_path):
         kmz = _make_kmz({"data.json": b"{}"}, tmp_path)
@@ -199,7 +198,7 @@ class TestKMLParser:
             parse_kml(f)
 
     def test_linestring_not_allowed_by_default(self, tmp_path):
-        kml = _kml("""
+        kml = _kml(f"""
 <Placemark><name>Road</name>
   <LineString><coordinates>-94,36 -94.1,36.1</coordinates></LineString>
 </Placemark>""")
@@ -208,7 +207,7 @@ class TestKMLParser:
             parse_kml(f)
 
     def test_linestring_allowed_when_configured(self, tmp_path):
-        kml = _kml("""
+        kml = _kml(f"""
 <Placemark><name>Road</name>
   <LineString><coordinates>-94,36 -94.1,36.1</coordinates></LineString>
 </Placemark>""")
@@ -244,7 +243,7 @@ class TestKMLParser:
         assert "Bad" in str(exc_info.value) or "Placemark[1]" in str(exc_info.value)
 
     def test_malformed_coordinates(self, tmp_path):
-        kml = _kml("""
+        kml = _kml(f"""
 <Placemark><name>BadCoords</name>
   <Polygon>
     <outerBoundaryIs><LinearRing>
@@ -263,8 +262,17 @@ class TestKMLParser:
         assert features == []
 
     def test_extended_data_extracted(self, tmp_path):
-        # Build the correct KML (valid structure):
-        kml2 = _kml("""
+        kml = _kml(f"""
+<Placemark>
+  <name>WithData</name>
+  <ExtendedData><SchemaData>
+    <SimpleData name="parcel_id">ABC123</SimpleData>
+    <SimpleData name="owner">Smith</SimpleData>
+  </SchemaData></ExtendedData>
+  {_simple_placemark().strip()}
+</Placemark>""")
+        # Nested Placemark above is wrong structure; build correct one
+        kml2 = _kml(f"""
 <Placemark>
   <name>WithData</name>
   <ExtendedData><SchemaData>
@@ -359,7 +367,10 @@ class TestGeometryValidator:
     def test_invalid_geom_repair_enabled_logs_assumption(self, caplog):
         """Self-intersecting polygon with non-zero area -- repaired with repair_ok=True."""
         import logging
-        # Use a known-invalid crossing ring (figure-8 that genuinely self-intersects).
+        # Figure-8 style: two overlapping boxes sharing a corner
+        # shapely reports is_valid=False (self-touching), buffer(0) repairs it
+        # This polygon may or may not be invalid depending on shapely version.
+        # Use a known-invalid: figure-8 that genuinely self-intersects.
         from shapely.geometry import Polygon as ShpPoly
         # Build a polygon that IS invalid by construction using a crossing ring
         cross_coords = [(-94, 36), (-93.9, 36.1), (-93.9, 36.0), (-94, 36.1), (-94, 36)]

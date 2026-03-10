@@ -3,10 +3,9 @@ from __future__ import annotations
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
 PLACEHOLDER_VALUES = {"YOUR_CHAT_MODEL", "YOUR_EMBED_MODEL", "CHANGE_ME", "TODO"}
 
-VALID_LOG_LEVELS = {"debug", "info", "warning", "error", "critical"}
+_VALID_LOG_LEVELS = frozenset({"debug", "info", "warning", "error"})
 
 
 class AppConfig(BaseModel):
@@ -17,9 +16,9 @@ class AppConfig(BaseModel):
     @classmethod
     def validate_log_level(cls, v: str) -> str:
         vv = v.strip().lower()
-        if vv not in VALID_LOG_LEVELS:
+        if vv not in _VALID_LOG_LEVELS:
             raise ValueError(
-                f"app.log_level={v!r} is not valid. Must be one of: {sorted(VALID_LOG_LEVELS)}"
+                f"app.log_level must be one of {sorted(_VALID_LOG_LEVELS)}, got: {v!r}"
             )
         return vv
 

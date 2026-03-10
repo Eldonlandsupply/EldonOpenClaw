@@ -3,10 +3,16 @@ app:
   log_level: ${LOG_LEVEL:info}
 
 llm:
-  chat_model: ${YOUR_CHAT_MODEL}
-  embedding_model: ${YOUR_EMBED_MODEL:}
+  chat_model: ${OPENCLAW_CHAT_MODEL}
+  embedding_model: ${OPENCLAW_EMBED_MODEL:}
+  base_url: ${OPENAI_BASE_URL:}
 
 memory:
   enabled: ${ENABLE_MEMORY:false}
   vector_store: ${VECTOR_STORE:local}
   vector_store_path: ${VECTOR_STORE_PATH:.data/vector_store}
+
+connectors:
+  cli: ${OPENCLAW_CONNECTOR_CLI:true}
+  telegram: ${OPENCLAW_CONNECTOR_TELEGRAM:false}
+  voice: ${OPENCLAW_CONNECTOR_VOICE:false}
