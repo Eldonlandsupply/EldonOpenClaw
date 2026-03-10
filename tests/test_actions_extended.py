@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from openclaw.actions.registry import ActionRegistry, HelpAction
+from openclaw.actions.registry import ActionRegistry
 from openclaw.actions.base import ActionResult, BaseAction
 
 

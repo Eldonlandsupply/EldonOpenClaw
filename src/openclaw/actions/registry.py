@@ -57,7 +57,6 @@ class HelpAction(BaseAction):
         self._registry = registry
 
     async def run(self, args: str, dry_run: bool = False) -> ActionResult:  # noqa: ARG002
-        registered = sorted(self._registry._actions.keys())
         allowed = sorted(self._registry._allowlist)
         lines = [
             "Available actions (registered & allowed):",

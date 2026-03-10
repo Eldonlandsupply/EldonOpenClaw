@@ -1,6 +1,8 @@
 
 from __future__ import annotations
-import asyncio, re, time
+import asyncio
+import re
+import time
 from typing import AsyncIterator
 import aiohttp
 from openclaw.connectors.base import BaseConnector, Message

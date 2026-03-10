@@ -6,15 +6,28 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 PLACEHOLDER_VALUES = {"YOUR_CHAT_MODEL", "YOUR_EMBED_MODEL", "CHANGE_ME", "TODO"}
 
+VALID_LOG_LEVELS = {"debug", "info", "warning", "error", "critical"}
+
 
 class AppConfig(BaseModel):
     env: str = Field(default="development")
     log_level: str = Field(default="info")
 
+    @field_validator("log_level")
+    @classmethod
+    def validate_log_level(cls, v: str) -> str:
+        vv = v.strip().lower()
+        if vv not in VALID_LOG_LEVELS:
+            raise ValueError(
+                f"app.log_level={v!r} is not valid. Must be one of: {sorted(VALID_LOG_LEVELS)}"
+            )
+        return vv
+
 
 class LLMConfig(BaseModel):
     chat_model: str = Field(..., min_length=1)
     embedding_model: Optional[str] = Field(default=None)
+    base_url: Optional[str] = Field(default=None)
 
     @field_validator("chat_model")
     @classmethod
@@ -40,6 +53,14 @@ class LLMConfig(BaseModel):
             )
         return vv
 
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        vv = v.strip()
+        return vv if vv else None
+
 
 class MemoryConfig(BaseModel):
     enabled: bool = Field(default=False)
@@ -63,10 +84,17 @@ class MemoryConfig(BaseModel):
         return vv
 
 
+class ConnectorsConfig(BaseModel):
+    cli: bool = Field(default=True)
+    telegram: bool = Field(default=False)
+    voice: bool = Field(default=False)
+
+
 class Settings(BaseModel):
     app: AppConfig = Field(default_factory=AppConfig)
     llm: LLMConfig
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
+    connectors: ConnectorsConfig = Field(default_factory=ConnectorsConfig)
 
     @model_validator(mode="after")
     def cross_field_gates(self) -> "Settings":

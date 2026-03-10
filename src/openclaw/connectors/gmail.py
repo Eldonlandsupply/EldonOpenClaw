@@ -8,7 +8,6 @@ import asyncio
 import email as email_lib
 import imaplib
 import smtplib
-import time
 from email.mime.text import MIMEText
 from typing import AsyncIterator
 

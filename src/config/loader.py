@@ -39,8 +39,8 @@ def load_settings(config_path: str = "config.yaml") -> Settings:
     p = Path(config_path)
     if not p.exists():
         raise RuntimeError(
-            f"Missing {config_path}. Create it or copy from a template. "
-            f"Expected at repo root: {p.resolve()}"
+            f"Config file not found: {config_path}. "
+            f"Create it or copy from a template. Expected at: {p.resolve()}"
         )
 
     raw = yaml.safe_load(p.read_text(encoding="utf-8")) or {}

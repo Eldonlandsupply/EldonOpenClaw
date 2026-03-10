@@ -21,7 +21,6 @@ import asyncio
 import json
 import signal
 import sys
-from typing import Optional
 
 from openclaw import __version__
 from openclaw.actions.registry import ActionRegistry

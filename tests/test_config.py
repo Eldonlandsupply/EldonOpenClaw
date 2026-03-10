@@ -5,7 +5,6 @@ No network. No real API keys.
 """
 from __future__ import annotations
 
-import os
 import textwrap
 from pathlib import Path
 
@@ -16,7 +15,6 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.config.loader import load_settings
-from src.config.schema import Settings
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
