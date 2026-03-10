@@ -9,8 +9,8 @@ app:
   log_level: ${OPENCLAW_LOG_LEVEL:info}
 
 llm:
-  provider: ${OPENCLAW_LLM_PROVIDER:openrouter}
-  chat_model: ${OPENCLAW_CHAT_MODEL:openai/gpt-4o-mini}
+  provider: ${OPENCLAW_LLM_PROVIDER:none}
+  chat_model: ${OPENCLAW_CHAT_MODEL:gpt-4o-mini}
   embedding_model: ${OPENCLAW_EMBED_MODEL:}
   # base_url is optional; leave blank for provider default
   base_url: ${OPENAI_BASE_URL:}

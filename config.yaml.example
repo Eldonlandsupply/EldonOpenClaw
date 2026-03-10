@@ -6,7 +6,7 @@
 
 llm:
   # openai | openrouter | anthropic | none
-  provider: ${LLM_PROVIDER:openrouter}
+  provider: ${LLM_PROVIDER:none}
   chat_model: ${LLM_CHAT_MODEL:openai/gpt-4o-mini}
   embedding_model: ${LLM_EMBED_MODEL:}
 
