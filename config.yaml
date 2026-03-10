@@ -1,40 +1,36 @@
 # ============================================================
-# EldonOpenClaw — config.yaml
-# Non-secrets only. Secrets live in .env / environment vars.
-# Syntax: ${VAR} or ${VAR:default}
+# EldonOpenClaw — config.yaml.example
+# Copy to config.yaml. Non-secrets only — secrets go in .env.
+# Supports ${VAR} and ${VAR:default} env substitution.
 # ============================================================
 
-app:
-  env: ${OPENCLAW_ENV:development}
-  log_level: ${OPENCLAW_LOG_LEVEL:info}
-
 llm:
-  provider: ${OPENCLAW_LLM_PROVIDER:none}
-  chat_model: ${OPENCLAW_CHAT_MODEL:gpt-4o-mini}
-  embedding_model: ${OPENCLAW_EMBED_MODEL:}
-  # base_url is optional; leave blank for provider default
-  base_url: ${OPENAI_BASE_URL:}
+  # openai | openrouter | anthropic | none
+  provider: ${LLM_PROVIDER:none}
+  chat_model: ${LLM_CHAT_MODEL:openai/gpt-4o-mini}
+  embedding_model: ${LLM_EMBED_MODEL:}
 
 runtime:
-  tick_seconds: ${OPENCLAW_TICK_SECONDS:10}
-  log_level: ${OPENCLAW_LOG_LEVEL:INFO}
-  data_dir: ${OPENCLAW_DATA_DIR:./data}
-  dry_run: ${OPENCLAW_DRY_RUN:false}
+  tick_seconds: ${TICK_SECONDS:10}
+  log_level: ${LOG_LEVEL:INFO}
+  data_dir: ${DATA_DIR:./data}
+  # IMPORTANT: set to false when ready for live operation
+  dry_run: ${DRY_RUN:false}
 
 connectors:
   cli:
-    enabled: ${OPENCLAW_CONNECTOR_CLI:true}
+    enabled: ${CONNECTOR_CLI:true}
   telegram:
-    enabled: ${OPENCLAW_CONNECTOR_TELEGRAM:false}
+    enabled: ${CONNECTOR_TELEGRAM:false}
 
 actions:
+  require_confirm: ${ACTION_CONFIRM:false}
   allowlist:
     - echo
     - memory_write
     - memory_read
-  require_confirm: ${OPENCLAW_ACTION_CONFIRM:false}
 
 health:
-  enabled: ${OPENCLAW_HEALTH_ENABLED:true}
-  host: ${OPENCLAW_HEALTH_HOST:127.0.0.1}
-  port: ${OPENCLAW_HEALTH_PORT:8080}
+  enabled: true
+  host: ${HEALTH_HOST:127.0.0.1}
+  port: ${HEALTH_PORT:8080}
