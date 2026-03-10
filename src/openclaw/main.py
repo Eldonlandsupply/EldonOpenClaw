@@ -197,10 +197,16 @@ async def run(yaml_path: str = "config.yaml") -> None:
         )
 
     if cfg.connectors.telegram.enabled:
-        logger.warning(
-            "Telegram connector enabled but not yet implemented. "
-            "Install openclaw[telegram] and wire TelegramConnector."
+        from openclaw.connectors.telegram import TelegramConnector
+        allowed = cfg.secrets.allowed_chat_ids
+        tg = TelegramConnector(
+            token=cfg.secrets.telegram_bot_token,
+            allowed_chat_ids=allowed,
         )
+        await tg.start()
+        connectors.append(tg)
+        tasks.append(asyncio.create_task(_message_loop(tg, registry, memory, chat_client)))
+        logger.info("Telegram connector active", extra={"allowed_chat_ids": allowed})
 
     logger.info("openclaw running — Ctrl+C to stop | type /reset to clear history")
 
