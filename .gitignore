@@ -26,7 +26,7 @@ data/
 
 # Logs
 *.log
-logs/
+logs/*.log
 
 # Editor
 .DS_Store
@@ -39,3 +39,4 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
+
