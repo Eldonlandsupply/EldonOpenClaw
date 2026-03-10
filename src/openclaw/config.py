@@ -132,6 +132,10 @@ class Secrets(BaseSettings):
     gmail_user: Optional[str] = None
     gmail_app_password: Optional[str] = None
     notification_email: Optional[str] = None
+    azure_tenant_id: Optional[str] = None
+    azure_client_id: Optional[str] = None
+    azure_client_secret: Optional[str] = None
+    outlook_user: Optional[str] = None
     sqlite_path: str = "./data/openclaw.db"
 
     @property

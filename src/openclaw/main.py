@@ -208,6 +208,31 @@ async def run(yaml_path: str = "config.yaml") -> None:
         tasks.append(asyncio.create_task(_message_loop(tg, registry, memory, chat_client)))
         logger.info("Telegram connector active", extra={"allowed_chat_ids": allowed})
 
+    if cfg.secrets.gmail_user and cfg.secrets.gmail_app_password:
+        from openclaw.connectors.gmail import GmailConnector
+        gm = GmailConnector(
+            user=cfg.secrets.gmail_user,
+            app_password=cfg.secrets.gmail_app_password,
+        )
+        await gm.start()
+        connectors.append(gm)
+        tasks.append(asyncio.create_task(_message_loop(gm, registry, memory, chat_client)))
+        logger.info("Gmail connector active", extra={"user": cfg.secrets.gmail_user})
+
+    if (cfg.secrets.azure_tenant_id and cfg.secrets.azure_client_id
+            and cfg.secrets.azure_client_secret and cfg.secrets.outlook_user):
+        from openclaw.connectors.outlook import OutlookConnector
+        ol = OutlookConnector(
+            tenant_id=cfg.secrets.azure_tenant_id,
+            client_id=cfg.secrets.azure_client_id,
+            client_secret=cfg.secrets.azure_client_secret,
+            user=cfg.secrets.outlook_user,
+        )
+        await ol.start()
+        connectors.append(ol)
+        tasks.append(asyncio.create_task(_message_loop(ol, registry, memory, chat_client)))
+        logger.info("Outlook connector active", extra={"user": cfg.secrets.outlook_user})
+
     logger.info("openclaw running — Ctrl+C to stop | type /reset to clear history")
 
     # ── Signal handling ───────────────────────────────────────────────────
