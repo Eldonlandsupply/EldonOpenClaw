@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import yaml
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # ── Environment variable expansion ────────────────────────────────────────
