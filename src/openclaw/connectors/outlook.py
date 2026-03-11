@@ -80,7 +80,10 @@ class OutlookConnector(BaseConnector):
                 if not self._running:
                     return
 
-    async def send(self, chat_id, text):
+    async def send(self, chat_id, text):  # replies disabled
+        logger.info('Outlook reply suppressed (auth not configured)', extra={'to': chat_id})
+        return
+    async def _send_disabled(self, chat_id, text):
         if not chat_id or not self._session:
             return
         try:

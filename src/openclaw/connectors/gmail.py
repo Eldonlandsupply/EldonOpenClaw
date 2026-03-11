@@ -83,7 +83,10 @@ class GmailConnector(BaseConnector):
                 if not self._running:
                     return
 
-    async def send(self, chat_id: str | None, text: str) -> None:
+    async def send(self, chat_id: str | None, text: str) -> None:  # replies disabled
+        logger.info('Gmail reply suppressed (auth not configured)', extra={'to': chat_id})
+        return
+    async def _send_disabled(self, chat_id: str | None, text: str) -> None:
         to = chat_id or self._user
         # Extract plain email from "Name <email>" format
         if "<" in to and ">" in to:
