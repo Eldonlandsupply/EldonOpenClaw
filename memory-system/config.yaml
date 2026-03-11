@@ -1,0 +1,57 @@
+# ============================================================
+# OpenClaw Semantic Memory System — config.yaml
+# ============================================================
+
+repo_root: ~/eldon/repos
+index_dir: ~/.openclaw-memory
+
+# File types to index
+include_extensions:
+  - .py
+  - .ts
+  - .js
+  - .md
+  - .json
+  - .yaml
+  - .yml
+  - .toml
+  - .env.example
+  - .ipynb
+
+# Paths to exclude (relative patterns)
+exclude_patterns:
+  - node_modules
+  - .git
+  - dist
+  - build
+  - .venv
+  - .cache
+  - __pycache__
+  - .eggs
+  - "*.egg-info"
+
+# Chunking
+max_chunk_size: 500       # tokens approx
+chunk_overlap: 50
+
+# Embedding backend (tried in order)
+embedding_backends:
+  - openai                # uses OPENROUTER_API_KEY + base_url
+  - sentence_transformers # offline fallback
+  - tfidf                 # last resort, no deps
+
+# OpenAI-compatible embedding endpoint
+openai_embed_model: text-embedding-3-small
+openai_base_url: https://openrouter.ai/api/v1
+
+# sentence-transformers fallback model
+st_model: all-MiniLM-L6-v2
+
+# Vector DB (chroma preferred, faiss fallback)
+vector_db: chroma
+
+# Background daemon
+scan_interval_seconds: 600   # 10 minutes
+
+# Search
+top_k: 8
