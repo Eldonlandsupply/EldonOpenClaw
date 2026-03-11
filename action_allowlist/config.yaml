@@ -1,0 +1,16 @@
+# Action Allowlist System Config
+allowlist_path: action_allowlist/top_100_actions.json
+backlog_path: action_allowlist/action_backlog.json
+checklist_path: action_allowlist/action_checklist.json
+audit_log_path: action_allowlist/audit_log.jsonl
+
+# Auto-execution safety gates
+auto_execute_max_risk_score: 3
+require_approver_for_modes:
+  - auto_execute
+  - approval_required
+never_auto_send_external_email: true
+never_auto_commit_financial: true
+
+# Review cadence
+action_review_interval_days: 30

@@ -1,61 +1,32 @@
-"""
-export_views.py
-
-Exports top_100_actions.json and action_checklist.json to CSV for
-spreadsheet review.
-
-Usage:
-    python scripts/export_views.py
-"""
-
+"""export_views.py — export actions to CSV for spreadsheet review."""
 from __future__ import annotations
-
-import csv
-import json
+import csv, json
 from pathlib import Path
 
-HERE = Path(__file__).parent.parent
-
-EXPORTS = [
-    (
-        HERE / "top_100_actions.json",
-        HERE / "top_100_actions.csv",
-        [
-            "rank", "action_id", "action_name", "action_category",
-            "status", "execution_mode", "composite_score",
-            "profit_impact_score", "value_score", "risk_score",
-            "owner", "trigger_type", "estimated_hours_saved_per_month",
-            "enabled",
-        ],
-    ),
-    (
-        HERE / "action_checklist.json",
-        HERE / "action_checklist.csv",
-        [
-            "checklist_item_id", "action_id", "action_name",
-            "task_type", "severity", "status", "assigned_to",
-            "due_date", "blocker_type", "blocker_description",
-        ],
-    ),
-]
-
-
-def export(src: Path, dst: Path, fields: list[str]) -> None:
-    if not src.exists():
-        print(f"SKIP: {src} not found.")
+def export_csv(actions, out_path):
+    if not actions:
         return
-    data = json.loads(src.read_text())
-    with dst.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(data)
-    print(f"Exported {len(data)} rows → {dst}")
+    keys = ["rank","action_id","action_name","action_category","execution_mode","status",
+            "composite_score","profit_impact_score","time_saved_score","risk_score","owner","enabled"]
+    with open(out_path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=keys, extrasaction="ignore")
+        w.writeheader()
+        w.writerows(actions)
+    print(f"Exported {len(actions)} rows -> {out_path}")
 
+def main():
+    root = Path(__file__).parent.parent
+    actions = json.loads((root / "top_100_actions.json").read_text())
+    export_csv(actions, root / "top_100_actions.csv")
 
-def main() -> None:
-    for src, dst, fields in EXPORTS:
-        export(src, dst, fields)
-
+    checklist = json.loads((root / "action_checklist.json").read_text()) if (root / "action_checklist.json").exists() else []
+    if checklist:
+        keys = ["checklist_item_id","action_id","task_type","task_description","severity","status","assigned_to"]
+        with open(root / "action_checklist.csv", "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=keys, extrasaction="ignore")
+            w.writeheader()
+            w.writerows(checklist)
+        print(f"Exported {len(checklist)} checklist rows -> action_checklist.csv")
 
 if __name__ == "__main__":
     main()

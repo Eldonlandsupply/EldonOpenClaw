@@ -1,62 +1,41 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "EldonOpenClaw Action Schema",
-  "description": "Canonical schema for all action allowlist entries",
   "type": "object",
-  "required": [
-    "action_id", "action_name", "action_category", "action_description",
-    "business_goal", "execution_mode", "status", "owner",
-    "trigger_type", "risk_score", "value_score"
-  ],
+  "required": ["action_id","action_name","action_category","execution_mode","status","trigger_type","owner","risk_score","enabled"],
   "properties": {
-    "action_id":            { "type": "string", "pattern": "^ACT-[0-9]{4}$" },
-    "action_name":          { "type": "string", "minLength": 3 },
-    "action_category": {
-      "type": "string",
-      "enum": ["CEO_LEVERAGE", "REVENUE_ACCELERATION", "ADMIN_ELIMINATION", "EXECUTION_CONTROL"]
-    },
-    "action_subcategory":   { "type": "string" },
-    "action_description":   { "type": "string", "minLength": 10 },
-    "business_goal":        { "type": "string" },
-    "expected_value_type": {
-      "type": "string",
-      "enum": ["revenue", "time_saved", "risk_reduced", "cost_avoided", "relationship"]
-    },
-    "value_score":          { "type": "integer", "minimum": 1, "maximum": 10 },
-    "frequency_score":      { "type": "integer", "minimum": 1, "maximum": 10 },
-    "time_saved_score":     { "type": "integer", "minimum": 1, "maximum": 10 },
-    "profit_impact_score":  { "type": "integer", "minimum": 1, "maximum": 10 },
-    "risk_score":           { "type": "integer", "minimum": 1, "maximum": 10 },
-    "confidence_score":     { "type": "integer", "minimum": 1, "maximum": 10 },
-    "composite_score":      { "type": "number" },
-    "rank":                 { "type": "integer", "minimum": 1 },
-    "status": {
-      "type": "string",
-      "enum": ["proposed", "under_review", "approved", "enabled", "paused", "deprecated", "rejected", "archived"]
-    },
-    "execution_mode": {
-      "type": "string",
-      "enum": ["auto_execute", "draft_then_review", "recommend_only", "approval_required", "manual_only"]
-    },
-    "trigger_type": {
-      "type": "string",
-      "enum": ["scheduled", "event_driven", "on_demand", "continuous", "threshold"]
-    },
-    "trigger_definition":   { "type": "string" },
-    "required_inputs":      { "type": "array", "items": { "type": "string" } },
-    "optional_inputs":      { "type": "array", "items": { "type": "string" } },
-    "system_dependencies":  { "type": "array", "items": { "type": "string" } },
-    "owner":                { "type": "string" },
-    "approver":             { "type": "string" },
-    "escalation_path":      { "type": "string" },
-    "success_metric":       { "type": "string" },
-    "failure_metric":       { "type": "string" },
-    "estimated_hours_saved_per_month": { "type": "number" },
-    "last_executed_at":     { "type": ["string", "null"], "format": "date-time" },
-    "last_reviewed_at":     { "type": ["string", "null"], "format": "date-time" },
-    "review_due_date":      { "type": ["string", "null"], "format": "date" },
-    "enabled":              { "type": "boolean" },
-    "notes":                { "type": "string" },
-    "tags":                 { "type": "array", "items": { "type": "string" } }
+    "action_id":           {"type": "string", "pattern": "^ACT-[0-9]{4}$"},
+    "action_name":         {"type": "string"},
+    "action_category":     {"type": "string", "enum": ["ceo_leverage","revenue_acceleration","admin_elimination","execution_control"]},
+    "action_subcategory":  {"type": "string"},
+    "action_description":  {"type": "string"},
+    "business_goal":       {"type": "string"},
+    "expected_value_type": {"type": "string", "enum": ["revenue","time_saved","risk_reduced","relationship","cost_avoided","speed"]},
+    "value_score":         {"type": "number", "minimum": 0, "maximum": 10},
+    "frequency_score":     {"type": "number", "minimum": 0, "maximum": 10},
+    "time_saved_score":    {"type": "number", "minimum": 0, "maximum": 10},
+    "profit_impact_score": {"type": "number", "minimum": 0, "maximum": 10},
+    "risk_score":          {"type": "number", "minimum": 0, "maximum": 10},
+    "confidence_score":    {"type": "number", "minimum": 0, "maximum": 10},
+    "composite_score":     {"type": "number"},
+    "rank":                {"type": "integer"},
+    "status":              {"type": "string", "enum": ["proposed","under_review","approved","enabled","paused","deprecated","rejected","archived"]},
+    "execution_mode":      {"type": "string", "enum": ["auto_execute","draft_then_review","recommend_only","approval_required","manual_only"]},
+    "trigger_type":        {"type": "string", "enum": ["schedule","event","threshold","request","manual"]},
+    "trigger_definition":  {"type": "string"},
+    "required_inputs":     {"type": "array", "items": {"type": "string"}},
+    "optional_inputs":     {"type": "array", "items": {"type": "string"}},
+    "system_dependencies": {"type": "array", "items": {"type": "string"}},
+    "owner":               {"type": "string"},
+    "approver":            {"type": "string"},
+    "escalation_path":     {"type": "string"},
+    "success_metric":      {"type": "string"},
+    "failure_metric":      {"type": "string"},
+    "last_executed_at":    {"type": ["string","null"]},
+    "last_reviewed_at":    {"type": ["string","null"]},
+    "review_due_date":     {"type": ["string","null"]},
+    "enabled":             {"type": "boolean"},
+    "notes":               {"type": "string"},
+    "tags":                {"type": "array", "items": {"type": "string"}}
   }
 }

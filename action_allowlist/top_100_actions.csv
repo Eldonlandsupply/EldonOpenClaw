@@ -1,26 +1,101 @@
-rank,action_id,action_name,action_category,status,execution_mode,composite_score,profit_impact_score,value_score,risk_score,owner,trigger_type,estimated_hours_saved_per_month,enabled
-1,ACT-0002,daily_priority_brief,CEO_LEVERAGE,enabled,auto_execute,7.286,8,10,1,OpenClaw,scheduled,5.0,True
-2,ACT-0001,stale_deal_followup_prompt,REVENUE_ACCELERATION,approved,draft_then_review,7.048,10,10,2,CEO,scheduled,6.0,True
-3,ACT-0007,weekly_pipeline_review_pack,REVENUE_ACCELERATION,enabled,auto_execute,6.952,9,9,1,OpenClaw,scheduled,4.0,True
-4,ACT-0006,invoice_overdue_followup,REVENUE_ACCELERATION,approved,draft_then_review,6.714,10,10,3,Operations,scheduled,5.0,True
-5,ACT-0014,proposal_followup_prompt,REVENUE_ACCELERATION,approved,draft_then_review,6.619,10,10,2,CEO,event_driven,4.0,True
-6,ACT-0003,pre_meeting_dossier,CEO_LEVERAGE,enabled,auto_execute,6.476,7,9,1,OpenClaw,event_driven,8.0,True
-7,ACT-0019,focus_block_protection,CEO_LEVERAGE,approved,recommend_only,6.429,7,9,1,OpenClaw,scheduled,4.0,True
-8,ACT-0010,permit_interconnect_followup,EXECUTION_CONTROL,approved,draft_then_review,6.381,9,9,2,Project Manager,scheduled,5.0,True
-9,ACT-0021,lead_routing_and_prioritization,REVENUE_ACCELERATION,approved,recommend_only,6.286,9,9,2,OpenClaw,event_driven,4.0,True
-10,ACT-0009,inbox_priority_triage,ADMIN_ELIMINATION,enabled,recommend_only,6.238,6,9,2,OpenClaw,scheduled,10.0,True
-11,ACT-0016,milestone_slippage_detection,EXECUTION_CONTROL,approved,recommend_only,6.19,8,9,1,Project Manager,continuous,3.0,True
-12,ACT-0004,post_meeting_action_extraction,EXECUTION_CONTROL,approved,draft_then_review,6.19,7,9,2,OpenClaw,event_driven,6.0,True
-13,ACT-0005,low_value_meeting_flag,CEO_LEVERAGE,enabled,recommend_only,6.095,7,9,2,OpenClaw,scheduled,4.0,True
-14,ACT-0025,task_capture_from_unstructured_input,ADMIN_ELIMINATION,enabled,draft_then_review,6.095,6,8,1,OpenClaw,event_driven,5.0,True
-15,ACT-0012,weekly_ceo_commitments_review,CEO_LEVERAGE,enabled,auto_execute,6.0,7,9,1,OpenClaw,scheduled,4.0,True
-16,ACT-0018,repetitive_task_detection,ADMIN_ELIMINATION,enabled,recommend_only,6.0,6,8,1,OpenClaw,scheduled,2.0,True
-17,ACT-0013,document_collection_reminder,EXECUTION_CONTROL,approved,draft_then_review,5.81,8,8,2,Operations,scheduled,4.0,True
-18,ACT-0017,approval_queue_digest,EXECUTION_CONTROL,approved,auto_execute,5.762,6,8,2,OpenClaw,scheduled,3.0,True
-19,ACT-0008,contract_expiry_alert,EXECUTION_CONTROL,approved,recommend_only,5.571,8,9,2,Operations,threshold,2.0,True
-20,ACT-0015,partner_relationship_watchlist,CEO_LEVERAGE,approved,recommend_only,5.476,8,8,1,CEO,threshold,2.0,True
-21,ACT-0022,budget_variance_alert,EXECUTION_CONTROL,approved,recommend_only,5.429,8,8,2,Operations,threshold,2.0,True
-22,ACT-0024,crm_hygiene_sweep,REVENUE_ACCELERATION,approved,recommend_only,5.429,7,7,1,OpenClaw,scheduled,2.0,True
-23,ACT-0011,vendor_deadline_monitor,EXECUTION_CONTROL,approved,recommend_only,5.333,7,8,2,Project Manager,threshold,3.0,True
-24,ACT-0020,routine_status_report_generation,ADMIN_ELIMINATION,approved,draft_then_review,5.238,5,7,2,Project Manager,scheduled,6.0,True
-25,ACT-0023,meeting_agenda_auto_draft,ADMIN_ELIMINATION,approved,draft_then_review,5.143,5,7,1,OpenClaw,event_driven,3.0,True
+rank,action_id,action_name,action_category,execution_mode,status,composite_score,profit_impact_score,time_saved_score,risk_score,owner,enabled
+1,ACT-0015,Invoice Follow-Up,revenue_acceleration,draft_then_review,enabled,8.95,10,8,1,openclaw,True
+2,ACT-0012,Proposal Follow-Up Reminder,revenue_acceleration,draft_then_review,enabled,8.75,10,7,1,openclaw,True
+3,ACT-0011,Stale Deal Detection,revenue_acceleration,draft_then_review,enabled,8.7,10,7,2,openclaw,True
+4,ACT-0001,Daily Priority Brief,ceo_leverage,draft_then_review,enabled,8.65,8,9,2,openclaw,True
+5,ACT-0022,Missing Signature Alert,revenue_acceleration,draft_then_review,enabled,8.15,9,7,1,openclaw,True
+6,ACT-0021,Weekly Pipeline Review Pack,revenue_acceleration,draft_then_review,enabled,8.1,9,8,1,openclaw,True
+7,ACT-0017,Meeting-to-Revenue Conversion Prompt,revenue_acceleration,draft_then_review,enabled,8.05,9,7,1,openclaw,True
+8,ACT-0004,Commitments Tracker,ceo_leverage,draft_then_review,enabled,8.0,8,7,2,openclaw,True
+9,ACT-0020,Utility/Interconnection Follow-Up,revenue_acceleration,draft_then_review,enabled,7.95,9,7,2,openclaw,True
+10,ACT-0010,Inbox Priority Triage,ceo_leverage,recommend_only,enabled,7.9,6,9,2,openclaw,True
+11,ACT-0002,Pre-Meeting Dossier,ceo_leverage,draft_then_review,enabled,7.85,7,8,2,openclaw,True
+12,ACT-0009,Post-Meeting Action Extraction,ceo_leverage,draft_then_review,enabled,7.85,7,8,2,openclaw,True
+13,ACT-0042,Open-Item Tracker,execution_control,auto_execute,enabled,7.85,7,7,1,openclaw,True
+14,ACT-0045,Follow-Up Scheduling,execution_control,auto_execute,enabled,7.85,7,7,1,openclaw,True
+15,ACT-0005,Approval Batch Window,ceo_leverage,draft_then_review,enabled,7.8,7,9,2,openclaw,True
+16,ACT-0007,Partner Relationship Watchlist,ceo_leverage,recommend_only,enabled,7.8,9,6,2,openclaw,True
+17,ACT-0014,Contract Status Tracker,revenue_acceleration,draft_then_review,enabled,7.75,9,7,3,openclaw,True
+18,ACT-0016,Diligence Checklist Management,revenue_acceleration,draft_then_review,enabled,7.75,9,7,3,openclaw,True
+19,ACT-0033,Task Capture from Email,admin_elimination,recommend_only,enabled,7.75,7,8,2,openclaw,True
+20,ACT-0006,Weekly CEO Intelligence Brief,ceo_leverage,draft_then_review,enabled,7.7,8,8,2,openclaw,True
+21,ACT-0031,Recurring Status Report Generation,admin_elimination,draft_then_review,enabled,7.7,6,9,1,openclaw,True
+22,ACT-0029,Open Approval Queue,execution_control,recommend_only,enabled,7.65,7,7,2,openclaw,True
+23,ACT-0043,Responsibility Assignment After Meeting,execution_control,draft_then_review,enabled,7.65,7,7,2,openclaw,True
+24,ACT-0027,Project Milestone Slippage Detection,execution_control,recommend_only,proposed,7.55,8,7,2,openclaw,False
+25,ACT-0030,Blocker Escalation,execution_control,recommend_only,enabled,7.55,8,7,2,openclaw,True
+26,ACT-0013,Prospect Prioritization,revenue_acceleration,recommend_only,enabled,7.5,9,6,2,openclaw,True
+27,ACT-0026,Vendor Deadline Monitor,execution_control,recommend_only,enabled,7.5,8,7,2,openclaw,True
+28,ACT-0044,Unresolved Commercial Issue Summary,execution_control,recommend_only,enabled,7.5,9,6,2,openclaw,True
+29,ACT-0047,Energy Market Data Digest,execution_control,draft_then_review,proposed,7.5,7,7,1,openclaw,False
+30,ACT-0024,Permitting Deadline Monitor,revenue_acceleration,recommend_only,enabled,7.45,9,6,2,openclaw,True
+31,ACT-0019,Commercial Risk Flag,revenue_acceleration,recommend_only,enabled,7.4,9,6,3,openclaw,True
+32,ACT-0028,Document Collection Reminder,execution_control,draft_then_review,enabled,7.3,7,7,1,openclaw,True
+33,ACT-0003,Low-Value Meeting Flag,ceo_leverage,recommend_only,enabled,7.25,6,9,3,openclaw,True
+34,ACT-0039,Inbox Zero Routing,admin_elimination,auto_execute,enabled,7.15,4,9,2,openclaw,True
+35,ACT-0041,Permit Application Status Follow-Up,execution_control,draft_then_review,enabled,7.15,8,6,2,openclaw,True
+36,ACT-0038,Repetitive Work Pattern Detection,admin_elimination,recommend_only,enabled,7.1,7,8,1,openclaw,True
+37,ACT-0023,Partner Response Escalation,revenue_acceleration,recommend_only,enabled,7.05,8,6,2,openclaw,True
+38,ACT-0032,Meeting Agenda Drafting,admin_elimination,draft_then_review,enabled,7.05,5,8,1,openclaw,True
+39,ACT-0037,Delegation Opportunity Detection,admin_elimination,recommend_only,enabled,7.05,6,9,2,openclaw,True
+40,ACT-0036,Routine Email Reply Drafting,admin_elimination,draft_then_review,enabled,7.0,5,8,2,openclaw,True
+41,ACT-0046,CRM Hygiene Run,execution_control,recommend_only,enabled,7.0,7,7,1,openclaw,True
+42,ACT-0035,Unresolved Issue Escalation Summary,admin_elimination,recommend_only,enabled,6.95,7,7,2,openclaw,True
+43,ACT-0008,Focus Block Protection,ceo_leverage,recommend_only,enabled,6.9,6,8,1,openclaw,True
+44,ACT-0034,Note Organization,admin_elimination,auto_execute,enabled,6.9,5,8,1,openclaw,True
+45,ACT-0018,Budget Variance Alert,revenue_acceleration,recommend_only,proposed,6.8,8,6,3,openclaw,False
+46,ACT-0050,Action Allowlist Self-Review,execution_control,recommend_only,enabled,6.8,7,7,1,openclaw,True
+47,ACT-0025,Investor Update Draft,revenue_acceleration,draft_then_review,enabled,6.7,8,7,3,openclaw,True
+48,ACT-0048,Competitive Intelligence Monitoring,execution_control,draft_then_review,proposed,6.35,7,6,2,openclaw,False
+49,ACT-0040,File Naming and Routing Standards,admin_elimination,recommend_only,proposed,6.2,4,7,2,openclaw,False
+50,ACT-0049,Expense Report Reminder,admin_elimination,auto_execute,enabled,5.5,4,5,1,openclaw,True
+51,ACT-0051,Real-Time Project Dashboard Generation,execution_control,manual_only,proposed,0.6,5,5,3,,False
+52,ACT-0052,Vendor Performance Scorecard,execution_control,manual_only,proposed,0.6,5,5,3,,False
+53,ACT-0053,Monthly Financial Close Checklist,admin_elimination,manual_only,proposed,0.6,5,5,3,,False
+54,ACT-0054,Board Meeting Prep Pack,ceo_leverage,manual_only,proposed,0.6,5,5,3,,False
+55,ACT-0055,Due Diligence Room Organization,revenue_acceleration,manual_only,proposed,0.6,5,5,3,,False
+56,ACT-0056,New Contact Onboarding to CRM,admin_elimination,manual_only,proposed,0.6,5,5,3,,False
+57,ACT-0057,Lease Expiry Tracker,revenue_acceleration,manual_only,proposed,0.6,5,5,3,,False
+58,ACT-0058,Equipment Maintenance Reminder,execution_control,manual_only,proposed,0.6,5,5,3,,False
+59,ACT-0059,Staff Onboarding Checklist Automation,admin_elimination,manual_only,proposed,0.6,5,5,3,,False
+60,ACT-0060,Quarterly Business Review Draft,ceo_leverage,manual_only,proposed,0.6,5,5,3,,False
+61,ACT-0061,Key Person Risk Monitor,ceo_leverage,manual_only,proposed,0.6,5,5,3,,False
+62,ACT-0062,Land Acquisition Pipeline Review,revenue_acceleration,manual_only,proposed,0.6,5,5,3,,False
+63,ACT-0063,Title Search Status Tracker,execution_control,manual_only,proposed,0.6,5,5,3,,False
+64,ACT-0064,Survey Completion Monitor,execution_control,manual_only,proposed,0.6,5,5,3,,False
+65,ACT-0065,Insurance Certificate Tracker,execution_control,manual_only,proposed,0.6,5,5,3,,False
+66,ACT-0066,NDA Expiry Monitor,revenue_acceleration,manual_only,proposed,0.6,5,5,3,,False
+67,ACT-0067,LOI Conversion Follow-Up,revenue_acceleration,manual_only,proposed,0.6,5,5,3,,False
+68,ACT-0068,Regulatory Change Digest,execution_control,manual_only,proposed,0.6,5,5,3,,False
+69,ACT-0069,Meeting Recorder and Transcript Intake,admin_elimination,manual_only,proposed,0.6,5,5,3,,False
+70,ACT-0070,Staff Weekly Update Request,admin_elimination,manual_only,proposed,0.6,5,5,3,,False
+71,ACT-0071,Project Budget vs Actual Monthly Report,execution_control,manual_only,proposed,0.6,5,5,3,,False
+72,ACT-0072,Debt Covenant Monitor,revenue_acceleration,manual_only,proposed,0.6,5,5,3,,False
+73,ACT-0073,Lender Communication Follow-Up,revenue_acceleration,manual_only,proposed,0.6,5,5,3,,False
+74,ACT-0074,Environmental Study Status Tracker,execution_control,manual_only,proposed,0.6,5,5,3,,False
+75,ACT-0075,EPC Contract Milestone Monitor,execution_control,manual_only,proposed,0.6,5,5,3,,False
+76,ACT-0076,Annual Review Reminder,admin_elimination,manual_only,proposed,0.6,5,5,3,,False
+77,ACT-0077,Holiday Coverage Planning,admin_elimination,manual_only,proposed,0.6,5,5,3,,False
+78,ACT-0078,Strategic Initiative Progress Tracker,ceo_leverage,manual_only,proposed,0.6,5,5,3,,False
+79,ACT-0079,Partnership Agreement Renewal Tracker,revenue_acceleration,manual_only,proposed,0.6,5,5,3,,False
+80,ACT-0080,Tax Deadline Calendar,admin_elimination,manual_only,proposed,0.6,5,5,3,,False
+81,ACT-0081,Interconnection Study Follow-Up,execution_control,manual_only,proposed,0.6,5,5,3,,False
+82,ACT-0082,Energy Storage Project Tracker,execution_control,manual_only,proposed,0.6,5,5,3,,False
+83,ACT-0083,Landowner Communication Log,execution_control,manual_only,proposed,0.6,5,5,3,,False
+84,ACT-0084,Site Control Expiry Tracker,revenue_acceleration,manual_only,proposed,0.6,5,5,3,,False
+85,ACT-0085,County Approval Status Monitor,execution_control,manual_only,proposed,0.6,5,5,3,,False
+86,ACT-0086,Market Pricing Comparison Generator,revenue_acceleration,manual_only,proposed,0.6,5,5,3,,False
+87,ACT-0087,Proposal Version Control,revenue_acceleration,manual_only,proposed,0.6,5,5,3,,False
+88,ACT-0088,Meeting Cost Calculator,ceo_leverage,manual_only,proposed,0.6,5,5,3,,False
+89,ACT-0089,Communication Tone Review,admin_elimination,manual_only,proposed,0.6,5,5,3,,False
+90,ACT-0090,Legal Hold Notification,execution_control,manual_only,proposed,0.6,5,5,3,,False
+91,ACT-0091,Data Room Access Log Review,execution_control,manual_only,proposed,0.6,5,5,3,,False
+92,ACT-0092,Bank Reconciliation Reminder,admin_elimination,manual_only,proposed,0.6,5,5,3,,False
+93,ACT-0093,Counterparty Credit Check,revenue_acceleration,manual_only,proposed,0.6,5,5,3,,False
+94,ACT-0094,Project IRR Recalculation Trigger,revenue_acceleration,manual_only,proposed,0.6,5,5,3,,False
+95,ACT-0095,Staff Capacity Utilization Report,ceo_leverage,manual_only,proposed,0.6,5,5,3,,False
+96,ACT-0096,Press Release Draft,ceo_leverage,manual_only,proposed,0.6,5,5,3,,False
+97,ACT-0097,RFP Response Draft,revenue_acceleration,manual_only,proposed,0.6,5,5,3,,False
+98,ACT-0098,Lessons Learned Capture,execution_control,manual_only,proposed,0.6,5,5,3,,False
+99,ACT-0099,Vendor Contract Renewal Tracker,execution_control,manual_only,proposed,0.6,5,5,3,,False
+100,ACT-0100,Knowledge Base Gap Detection,admin_elimination,manual_only,proposed,0.6,5,5,3,,False
