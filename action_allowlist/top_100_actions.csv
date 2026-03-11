@@ -1,0 +1,26 @@
+rank,action_id,action_name,action_category,status,execution_mode,composite_score,profit_impact_score,value_score,risk_score,owner,trigger_type,estimated_hours_saved_per_month,enabled
+1,ACT-0002,daily_priority_brief,CEO_LEVERAGE,enabled,auto_execute,7.286,8,10,1,OpenClaw,scheduled,5.0,True
+2,ACT-0001,stale_deal_followup_prompt,REVENUE_ACCELERATION,approved,draft_then_review,7.048,10,10,2,CEO,scheduled,6.0,True
+3,ACT-0007,weekly_pipeline_review_pack,REVENUE_ACCELERATION,enabled,auto_execute,6.952,9,9,1,OpenClaw,scheduled,4.0,True
+4,ACT-0006,invoice_overdue_followup,REVENUE_ACCELERATION,approved,draft_then_review,6.714,10,10,3,Operations,scheduled,5.0,True
+5,ACT-0014,proposal_followup_prompt,REVENUE_ACCELERATION,approved,draft_then_review,6.619,10,10,2,CEO,event_driven,4.0,True
+6,ACT-0003,pre_meeting_dossier,CEO_LEVERAGE,enabled,auto_execute,6.476,7,9,1,OpenClaw,event_driven,8.0,True
+7,ACT-0019,focus_block_protection,CEO_LEVERAGE,approved,recommend_only,6.429,7,9,1,OpenClaw,scheduled,4.0,True
+8,ACT-0010,permit_interconnect_followup,EXECUTION_CONTROL,approved,draft_then_review,6.381,9,9,2,Project Manager,scheduled,5.0,True
+9,ACT-0021,lead_routing_and_prioritization,REVENUE_ACCELERATION,approved,recommend_only,6.286,9,9,2,OpenClaw,event_driven,4.0,True
+10,ACT-0009,inbox_priority_triage,ADMIN_ELIMINATION,enabled,recommend_only,6.238,6,9,2,OpenClaw,scheduled,10.0,True
+11,ACT-0016,milestone_slippage_detection,EXECUTION_CONTROL,approved,recommend_only,6.19,8,9,1,Project Manager,continuous,3.0,True
+12,ACT-0004,post_meeting_action_extraction,EXECUTION_CONTROL,approved,draft_then_review,6.19,7,9,2,OpenClaw,event_driven,6.0,True
+13,ACT-0005,low_value_meeting_flag,CEO_LEVERAGE,enabled,recommend_only,6.095,7,9,2,OpenClaw,scheduled,4.0,True
+14,ACT-0025,task_capture_from_unstructured_input,ADMIN_ELIMINATION,enabled,draft_then_review,6.095,6,8,1,OpenClaw,event_driven,5.0,True
+15,ACT-0012,weekly_ceo_commitments_review,CEO_LEVERAGE,enabled,auto_execute,6.0,7,9,1,OpenClaw,scheduled,4.0,True
+16,ACT-0018,repetitive_task_detection,ADMIN_ELIMINATION,enabled,recommend_only,6.0,6,8,1,OpenClaw,scheduled,2.0,True
+17,ACT-0013,document_collection_reminder,EXECUTION_CONTROL,approved,draft_then_review,5.81,8,8,2,Operations,scheduled,4.0,True
+18,ACT-0017,approval_queue_digest,EXECUTION_CONTROL,approved,auto_execute,5.762,6,8,2,OpenClaw,scheduled,3.0,True
+19,ACT-0008,contract_expiry_alert,EXECUTION_CONTROL,approved,recommend_only,5.571,8,9,2,Operations,threshold,2.0,True
+20,ACT-0015,partner_relationship_watchlist,CEO_LEVERAGE,approved,recommend_only,5.476,8,8,1,CEO,threshold,2.0,True
+21,ACT-0022,budget_variance_alert,EXECUTION_CONTROL,approved,recommend_only,5.429,8,8,2,Operations,threshold,2.0,True
+22,ACT-0024,crm_hygiene_sweep,REVENUE_ACCELERATION,approved,recommend_only,5.429,7,7,1,OpenClaw,scheduled,2.0,True
+23,ACT-0011,vendor_deadline_monitor,EXECUTION_CONTROL,approved,recommend_only,5.333,7,8,2,Project Manager,threshold,3.0,True
+24,ACT-0020,routine_status_report_generation,ADMIN_ELIMINATION,approved,draft_then_review,5.238,5,7,2,Project Manager,scheduled,6.0,True
+25,ACT-0023,meeting_agenda_auto_draft,ADMIN_ELIMINATION,approved,draft_then_review,5.143,5,7,1,OpenClaw,event_driven,3.0,True
