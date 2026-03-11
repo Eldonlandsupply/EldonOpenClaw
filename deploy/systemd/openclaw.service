@@ -6,25 +6,23 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=openclaw
-Group=openclaw
+User=pi
+Group=pi
 
-# Edit this to your actual install path
-WorkingDirectory=/opt/openclaw
+WorkingDirectory=/home/pi/EldonOpenClaw
 
-# Secrets file — chmod 600, owned by openclaw
-# Create with: sudo cp .env.example /etc/openclaw/openclaw.env && sudo chmod 600 /etc/openclaw/openclaw.env
-EnvironmentFile=/etc/openclaw/openclaw.env
+# Secrets — chmod 600, owned by pi
+# Created by: scripts/pi/install.sh
+EnvironmentFile=/home/pi/EldonOpenClaw/.env
 
-ExecStart=/opt/openclaw/.venv/bin/python -m openclaw.main /opt/openclaw/config.yaml
+ExecStart=/home/pi/EldonOpenClaw/.venv/bin/python -m openclaw.main /home/pi/EldonOpenClaw/config.yaml
 
 # 24/7 restart policy
 Restart=always
 RestartSec=5
 TimeoutStopSec=20
 
-# Structured JSON logs go to journald automatically
-# View with: journalctl -u openclaw -f
+# Logs via journald — view with: journalctl -u openclaw -f
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=openclaw
@@ -33,7 +31,9 @@ SyslogIdentifier=openclaw
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/var/lib/openclaw
+ReadWritePaths=/home/pi/EldonOpenClaw/data
+ReadWritePaths=/home/pi/EldonOpenClaw/logs
+ReadWritePaths=/home/pi/EldonOpenClaw/.data
 
 [Install]
 WantedBy=multi-user.target
