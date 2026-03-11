@@ -168,6 +168,15 @@ async def run(yaml_path: str = "config.yaml") -> None:
         dry_run=cfg.runtime.dry_run,
     )
 
+    # ── Attio integration ─────────────────────────────────────────────────
+    if cfg.secrets.attio_api_key:
+        from openclaw.integrations.attio.actions import build_attio_actions
+        for attio_action in build_attio_actions(cfg.secrets.attio_api_key):
+            registry.register(attio_action)
+        logger.info("Attio integration active — actions: attio_search, attio_note, attio_task, attio_tasks, attio_upsert")
+    else:
+        logger.info("Attio integration disabled — set ATTIO_API_KEY to enable")
+
     # ── Chat client ───────────────────────────────────────────────────────
     chat_client = ChatClient(cfg)
 

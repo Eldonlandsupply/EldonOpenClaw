@@ -29,6 +29,12 @@ actions:
     - echo
     - memory_write
     - memory_read
+    # ── Attio CRM (requires ATTIO_API_KEY in .env) ──
+    - attio_search   # attio_search <companies|people> <query>
+    - attio_note     # attio_note <object> <record_id> <title> | <body>
+    - attio_task     # attio_task <content> [linked:<obj>:<id>] [due:<ISO>]
+    - attio_tasks    # attio_tasks [open|done]
+    - attio_upsert   # attio_upsert <companies|people> <value> <json>
 
 health:
   enabled: true

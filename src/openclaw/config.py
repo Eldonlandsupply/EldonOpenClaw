@@ -136,6 +136,7 @@ class Secrets(BaseSettings):
     azure_client_id: Optional[str] = None
     azure_client_secret: Optional[str] = None
     outlook_user: Optional[str] = None
+    attio_api_key: Optional[str] = None
     sqlite_path: str = "./data/openclaw.db"
 
     @property
@@ -242,6 +243,7 @@ class AppConfig:
                 "telegram_bot_token": "SET" if self.secrets.telegram_bot_token else "NOT SET",
                 "gmail_user": self.secrets.gmail_user or "NOT SET",
                 "notification_email": self.secrets.notification_email or "NOT SET",
+                "attio_api_key": "SET" if self.secrets.attio_api_key else "NOT SET",
                 "sqlite_path": self.secrets.sqlite_path,
             },
         }
