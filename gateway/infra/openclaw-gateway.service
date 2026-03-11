@@ -1,0 +1,24 @@
+[Unit]
+Description=OpenClaw Telegram/SMS Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/EldonOpenClaw
+EnvironmentFile=/home/pi/EldonOpenClaw/.env
+ExecStart=/home/pi/EldonOpenClaw/.venv/bin/python scripts/run_gateway.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=openclaw-gateway
+
+# Harden
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

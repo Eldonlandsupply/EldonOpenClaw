@@ -1,0 +1,11 @@
+aiohttp>=3.9
+pydantic>=2.0
+pyyaml>=6.0
+python-dotenv>=1.0
+# Optional: psutil gives better system stats on Pi
+# psutil>=5.9
+# Required for SMS
+# twilio>=8.0
+# Dev/test
+pytest>=8.0
+pytest-asyncio>=0.23
