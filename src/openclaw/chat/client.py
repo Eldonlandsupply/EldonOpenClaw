@@ -1,9 +1,9 @@
 """
 src/openclaw/chat/client.py
 
-Async LLM chat client supporting OpenRouter and OpenAI.
-Uses the OpenAI-compatible /v1/chat/completions endpoint.
-Authorization is Bearer token (API key — often called "oauth" in OpenRouter docs).
+Async LLM chat client supporting OpenRouter, OpenAI, and xAI (Grok).
+All three expose an OpenAI-compatible /v1/chat/completions endpoint.
+Authorization is Bearer token.
 """
 from __future__ import annotations
 
@@ -22,16 +22,23 @@ _SYSTEM_PROMPT = (
     "Answer clearly and concisely."
 )
 
-_PROVIDER_URLS: dict[str, str] = {
+_PROVIDER_BASE_URLS: dict[str, str] = {
     "openrouter": "https://openrouter.ai/api/v1",
-    "openai": "https://api.openai.com/v1",
-    "anthropic": "https://api.anthropic.com/v1",  # note: different schema
+    "openai":     "https://api.openai.com/v1",
+    "xai":        "https://api.x.ai/v1",
+    "anthropic":  "https://api.anthropic.com/v1",  # non-compatible schema — not used here
 }
 
 
 class ChatClient:
     """
     Stateful async chat client with in-memory message history.
+
+    Supported providers:
+      openrouter — OpenRouter aggregator (OPENROUTER_API_KEY)
+      openai     — OpenAI direct (OPENAI_API_KEY, optional OPENAI_BASE_URL override)
+      xai        — xAI Grok models (XAI_API_KEY)
+      none       — echo mode, no API calls
 
     Usage:
         client = ChatClient(cfg)
@@ -41,15 +48,18 @@ class ChatClient:
     MAX_HISTORY = 40  # messages (user+assistant pairs)
 
     def __init__(self, cfg: AppConfig) -> None:
-        self._provider = cfg.llm.provider
+        self._provider = (cfg.llm.provider or "none").lower()
         self._model = cfg.llm.chat_model
 
         if self._provider == "openrouter":
-            self._base_url = _PROVIDER_URLS["openrouter"]
+            self._base_url = _PROVIDER_BASE_URLS["openrouter"]
             self._api_key = cfg.secrets.openrouter_api_key or ""
         elif self._provider == "openai":
-            self._base_url = cfg.llm.base_url or _PROVIDER_URLS["openai"]
+            self._base_url = cfg.llm.base_url or _PROVIDER_BASE_URLS["openai"]
             self._api_key = cfg.secrets.openai_api_key or ""
+        elif self._provider == "xai":
+            self._base_url = _PROVIDER_BASE_URLS["xai"]
+            self._api_key = cfg.secrets.xai_api_key or ""
         else:
             self._base_url = ""
             self._api_key = ""
@@ -94,6 +104,7 @@ class ChatClient:
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
+        # OpenRouter requires these extra headers for routing/analytics
         if self._provider == "openrouter":
             headers["HTTP-Referer"] = "https://github.com/Eldonlandsupply/EldonOpenClaw"
             headers["X-Title"] = "OpenClaw"

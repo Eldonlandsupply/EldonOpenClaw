@@ -3,10 +3,10 @@ app:
   log_level: ${OPENCLAW_LOG_LEVEL:info}
 
 llm:
-  provider: ${LLM_PROVIDER:openrouter}
-  chat_model: ${OPENCLAW_CHAT_MODEL}
+  provider: ${LLM_PROVIDER:xai}
+  chat_model: ${OPENCLAW_CHAT_MODEL:grok-3-mini}
   embedding_model: ${OPENCLAW_EMBED_MODEL:}
-  base_url: ${OPENAI_BASE_URL:https://openrouter.ai/api/v1}
+  base_url: ${OPENAI_BASE_URL:}
 
 memory:
   enabled: ${OPENCLAW_MEMORY_ENABLED:false}

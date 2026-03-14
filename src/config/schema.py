@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 PLACEHOLDER_VALUES = {"YOUR_CHAT_MODEL", "YOUR_EMBED_MODEL", "CHANGE_ME", "TODO"}
 
 _VALID_LOG_LEVELS = frozenset({"debug", "info", "warning", "error"})
+_VALID_PROVIDERS   = frozenset({"openrouter", "openai", "xai", "none"})
 
 
 class AppConfig(BaseModel):
@@ -24,9 +25,20 @@ class AppConfig(BaseModel):
 
 
 class LLMConfig(BaseModel):
+    provider: str = Field(default="none")
     chat_model: str = Field(..., min_length=1)
     embedding_model: Optional[str] = Field(default=None)
     base_url: Optional[str] = Field(default=None)
+
+    @field_validator("provider")
+    @classmethod
+    def validate_provider(cls, v: str) -> str:
+        vv = v.strip().lower()
+        if vv not in _VALID_PROVIDERS:
+            raise ValueError(
+                f"llm.provider must be one of {sorted(_VALID_PROVIDERS)}, got: {v!r}"
+            )
+        return vv
 
     @field_validator("chat_model")
     @classmethod
