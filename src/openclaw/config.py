@@ -44,9 +44,11 @@ def _expand(value: Any) -> Any:
 class LLMConfig:
     def __init__(self, **data: Any) -> None:
         self.provider = str(data.get("provider", "none"))
-        self.chat_model = str(data.get("chat_model", "gpt-4o-mini"))
+        self.chat_model = str(data.get("chat_model", "grok-3-mini"))
         raw_embed = data.get("embedding_model")
         self.embedding_model = str(raw_embed) if raw_embed else None
+        raw_base = data.get("base_url")
+        self.base_url = str(raw_base).strip() if raw_base else None
 
 
 class RuntimeConfig:
@@ -125,18 +127,27 @@ class Secrets(BaseSettings):
         extra="ignore",
     )
 
+    # xAI (Grok)
+    xai_api_key: Optional[str] = None
+    # OpenAI direct
     openai_api_key: Optional[str] = None
+    # OpenRouter
     openrouter_api_key: Optional[str] = None
+    # Messaging
     telegram_bot_token: Optional[str] = None
     telegram_allowed_chat_ids: Optional[str] = None
+    # Email
     gmail_user: Optional[str] = None
     gmail_app_password: Optional[str] = None
     notification_email: Optional[str] = None
+    # Outlook / Microsoft Graph
     azure_tenant_id: Optional[str] = None
     azure_client_id: Optional[str] = None
     azure_client_secret: Optional[str] = None
     outlook_user: Optional[str] = None
+    # CRM
     attio_api_key: Optional[str] = None
+    # Storage
     sqlite_path: str = "./data/openclaw.db"
 
     @property
@@ -148,7 +159,7 @@ class Secrets(BaseSettings):
 
 # ── Valid sets ─────────────────────────────────────────────────────────────
 
-_VALID_PROVIDERS: frozenset[str] = frozenset({"openai", "anthropic", "openrouter", "none"})
+_VALID_PROVIDERS: frozenset[str] = frozenset({"openai", "anthropic", "openrouter", "xai", "none"})
 _VALID_LOG_LEVELS: frozenset[str] = frozenset({"DEBUG", "INFO", "WARNING", "ERROR"})
 
 
@@ -164,7 +175,6 @@ class AppConfig:
         self._validate()
 
     def _load_yaml(self, path: str) -> None:
-        # Load .env first so ${VAR} expansion below sees the values
         load_dotenv(override=False)
 
         p = Path(path)
@@ -202,6 +212,8 @@ class AppConfig:
             self._fatal("llm.provider=openai but OPENAI_API_KEY is not set")
         if self.llm.provider == "openrouter" and not self.secrets.openrouter_api_key:
             self._fatal("llm.provider=openrouter but OPENROUTER_API_KEY is not set")
+        if self.llm.provider == "xai" and not self.secrets.xai_api_key:
+            self._fatal("llm.provider=xai but XAI_API_KEY is not set")
         if self.connectors.telegram.enabled and not self.secrets.telegram_bot_token:
             self._fatal("connectors.telegram.enabled=true but TELEGRAM_BOT_TOKEN is not set")
         Path(self.runtime.data_dir).mkdir(parents=True, exist_ok=True)
@@ -238,6 +250,7 @@ class AppConfig:
                 "port": self.health.port,
             },
             "secrets": {
+                "xai_api_key": "SET" if self.secrets.xai_api_key else "NOT SET",
                 "openai_api_key": "SET" if self.secrets.openai_api_key else "NOT SET",
                 "openrouter_api_key": "SET" if self.secrets.openrouter_api_key else "NOT SET",
                 "telegram_bot_token": "SET" if self.secrets.telegram_bot_token else "NOT SET",
