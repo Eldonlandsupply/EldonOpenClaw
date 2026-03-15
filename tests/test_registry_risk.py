@@ -34,7 +34,6 @@ FAKE_META = {
 
 @pytest.fixture
 def registry_with_meta():
-    """Registry with mocked catalogue meta and stub actions."""
     with patch("src.openclaw.actions.registry._load_allowlist_meta", return_value=FAKE_META):
         from src.openclaw.actions.registry import ActionRegistry
         from src.openclaw.actions.base import ActionResult, BaseAction
@@ -91,10 +90,10 @@ async def test_unknown_action_no_meta_still_works(registry_with_meta):
 
 
 def test_startup_warns_unimplemented(caplog):
-    """Registry logs a warning for allowlisted but unregistered actions."""
+    """Registry emits a WARNING listing unregistered-but-allowlisted action names."""
     with patch("src.openclaw.actions.registry._load_allowlist_meta", return_value={}):
-        # caplog must be set before the registry is created so it captures the warning
-        with caplog.at_level(logging.WARNING, logger="openclaw.actions.registry"):
+        # Capture at root level — logger name varies by PYTHONPATH at import time
+        with caplog.at_level(logging.WARNING):
             from src.openclaw.actions.registry import ActionRegistry
             ActionRegistry(allowlist=["nonexistent_action"], dry_run=True)
 
