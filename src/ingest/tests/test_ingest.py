@@ -36,12 +36,12 @@ from src.ingest.pipeline import ingest_kmz
 KML_NS = "http://www.opengis.net/kml/2.2"
 
 def _kml(body: str) -> str:
-    return f"""<?xml version="1.0" encoding="UTF-8"?>
+    return f'''<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="{KML_NS}">
 <Document>
 {body}
 </Document>
-</kml>"""
+</kml>'''
 
 
 def _simple_placemark(name: str = "A", lon: float = -94.0, lat: float = 36.0) -> str:
@@ -55,7 +55,7 @@ def _simple_placemark(name: str = "A", lon: float = -94.0, lat: float = 36.0) ->
     )
     return f"""
 <Placemark>
-  <name>{name}</name>
+  <n>{name}</n>
   <Polygon>
     <outerBoundaryIs>
       <LinearRing>
@@ -178,7 +178,7 @@ class TestKMLParser:
     def test_unknown_namespace_raises(self, tmp_path):
         bad_kml = """<?xml version="1.0"?>
 <kml xmlns="http://totally.unknown.ns/kml">
-<Document><Placemark><name>X</name></Placemark></Document>
+<Document><Placemark><n>X</n></Placemark></Document>
 </kml>"""
         f = self._write_kml(bad_kml, tmp_path)
         with pytest.raises(NamespaceError, match="unknown namespace"):
@@ -186,7 +186,7 @@ class TestKMLParser:
 
     def test_no_namespace_raises(self, tmp_path):
         bad_kml = """<?xml version="1.0"?>
-<kml><Document><Placemark><name>X</name></Placemark></Document></kml>"""
+<kml><Document><Placemark><n>X</n></Placemark></Document></kml>"""
         f = self._write_kml(bad_kml, tmp_path)
         with pytest.raises(NamespaceError, match="no namespace"):
             parse_kml(f)
@@ -198,8 +198,8 @@ class TestKMLParser:
             parse_kml(f)
 
     def test_linestring_not_allowed_by_default(self, tmp_path):
-        kml = _kml(f"""
-<Placemark><name>Road</name>
+        kml = _kml("""
+<Placemark><n>Road</n>
   <LineString><coordinates>-94,36 -94.1,36.1</coordinates></LineString>
 </Placemark>""")
         f = self._write_kml(kml, tmp_path)
@@ -207,8 +207,8 @@ class TestKMLParser:
             parse_kml(f)
 
     def test_linestring_allowed_when_configured(self, tmp_path):
-        kml = _kml(f"""
-<Placemark><name>Road</name>
+        kml = _kml("""
+<Placemark><n>Road</n>
   <LineString><coordinates>-94,36 -94.1,36.1</coordinates></LineString>
 </Placemark>""")
         f = self._write_kml(kml, tmp_path)
@@ -217,7 +217,7 @@ class TestKMLParser:
             parse_kml(f, allowed_geom_types=frozenset({"Polygon", "MultiGeometry", "LineString"}))
 
     def test_empty_placemark_no_geom(self, tmp_path):
-        kml = _kml("<Placemark><name>Empty</name></Placemark>")
+        kml = _kml("<Placemark><n>Empty</n></Placemark>")
         f = self._write_kml(kml, tmp_path)
         with pytest.raises((GeometryError, PartialSuccessError)):
             parse_kml(f)
@@ -225,7 +225,7 @@ class TestKMLParser:
     def test_partial_ok_skips_bad_placemarks(self, tmp_path):
         kml = _kml(
             _simple_placemark("Good")
-            + "\n<Placemark><name>Bad</name></Placemark>"
+            + "\n<Placemark><n>Bad</n></Placemark>"
         )
         f = self._write_kml(kml, tmp_path)
         features = parse_kml(f, partial_ok=True)
@@ -235,7 +235,7 @@ class TestKMLParser:
     def test_partial_ok_false_raises_on_any_failure(self, tmp_path):
         kml = _kml(
             _simple_placemark("Good")
-            + "\n<Placemark><name>Bad</name></Placemark>"
+            + "\n<Placemark><n>Bad</n></Placemark>"
         )
         f = self._write_kml(kml, tmp_path)
         with pytest.raises(PartialSuccessError) as exc_info:
@@ -243,8 +243,8 @@ class TestKMLParser:
         assert "Bad" in str(exc_info.value) or "Placemark[1]" in str(exc_info.value)
 
     def test_malformed_coordinates(self, tmp_path):
-        kml = _kml(f"""
-<Placemark><name>BadCoords</name>
+        kml = _kml("""
+<Placemark><n>BadCoords</n>
   <Polygon>
     <outerBoundaryIs><LinearRing>
       <coordinates>NOTANUMBER,36 -94,36 -94,37 NOTANUMBER,36</coordinates>
@@ -262,19 +262,9 @@ class TestKMLParser:
         assert features == []
 
     def test_extended_data_extracted(self, tmp_path):
-        kml = _kml(f"""
+        kml2 = _kml("""
 <Placemark>
-  <name>WithData</name>
-  <ExtendedData><SchemaData>
-    <SimpleData name="parcel_id">ABC123</SimpleData>
-    <SimpleData name="owner">Smith</SimpleData>
-  </SchemaData></ExtendedData>
-  {_simple_placemark().strip()}
-</Placemark>""")
-        # Nested Placemark above is wrong structure; build correct one
-        kml2 = _kml(f"""
-<Placemark>
-  <name>WithData</name>
+  <n>WithData</n>
   <ExtendedData><SchemaData>
     <SimpleData name="parcel_id">ABC123</SimpleData>
   </SchemaData></ExtendedData>
@@ -290,7 +280,7 @@ class TestKMLParser:
 
     def test_multigeometry_two_polygons(self, tmp_path):
         kml = _kml("""
-<Placemark><name>Multi</name>
+<Placemark><n>Multi</n>
   <MultiGeometry>
     <Polygon>
       <outerBoundaryIs><LinearRing>
