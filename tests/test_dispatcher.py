@@ -5,23 +5,21 @@ Verifies routing, memory built-ins, /reset, and LLM fallback.
 from __future__ import annotations
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 
 def make_dispatcher():
-    """Build a Dispatcher with mocked dependencies."""
     from src.openclaw.main import Dispatcher
     registry    = MagicMock()
     memory      = MagicMock()
     chat_client = MagicMock()
 
-    # Default: nothing is allowed
     registry.is_allowed.return_value = False
 
-    memory.get        = AsyncMock(return_value=None)
-    memory.list_keys  = AsyncMock(return_value=[])
-    memory.set        = AsyncMock()
-    memory.log_event  = AsyncMock()
+    memory.get       = AsyncMock(return_value=None)
+    memory.list_keys = AsyncMock(return_value=[])
+    memory.set       = AsyncMock()
+    memory.log_event = AsyncMock()
 
     chat_client.chat  = AsyncMock(return_value="LLM reply")
     chat_client.reset = MagicMock()
@@ -66,7 +64,7 @@ async def test_memory_write_allowed():
 
 @pytest.mark.asyncio
 async def test_memory_write_bad_syntax():
-    d, registry, memory, _ = make_dispatcher()
+    d, registry, _, _ = make_dispatcher()
     registry.is_allowed.side_effect = lambda name: name == "memory_write"
     reply = await d.handle("cli", None, "memory_write noequalssign")
     assert "ERROR" in reply

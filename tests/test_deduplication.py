@@ -1,7 +1,6 @@
 """Tests for cross-connector message deduplication."""
 from __future__ import annotations
 import time
-import pytest
 
 
 def test_first_message_not_duplicate():

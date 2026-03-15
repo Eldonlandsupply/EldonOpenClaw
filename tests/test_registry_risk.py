@@ -2,8 +2,12 @@
 Tests for ActionRegistry risk-score and execution_mode enforcement.
 """
 from __future__ import annotations
+
+import io
+import logging
+
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 FAKE_META = {
@@ -31,15 +35,16 @@ FAKE_META = {
 
 
 @pytest.fixture
-def registry_with_meta(tmp_path):
-    """Registry with mocked catalogue meta and a real EchoAction for 'echo'."""
+def registry_with_meta():
+    """Registry with mocked catalogue meta and stub actions."""
     with patch("src.openclaw.actions.registry._load_allowlist_meta", return_value=FAKE_META):
-        from src.openclaw.actions.registry import ActionRegistry, EchoAction
+        from src.openclaw.actions.registry import ActionRegistry
         from src.openclaw.actions.base import ActionResult, BaseAction
 
         class StubAction(BaseAction):
             def __init__(self, name_):
                 self.name = name_
+
             async def run(self, args, dry_run=False):
                 return ActionResult(success=True, output=f"ran {self.name}")
 
@@ -82,25 +87,24 @@ async def test_safe_auto_execute_succeeds(registry_with_meta):
 
 @pytest.mark.asyncio
 async def test_unknown_action_no_meta_still_works(registry_with_meta):
-    # echo has no meta entry — should dispatch normally
     result = await registry_with_meta.dispatch("echo", "test")
     assert result.success is True
     assert "test" in str(result.output)
 
 
-def test_startup_warns_unimplemented(capsys):
-    """Registry should log a warning for allowlisted but unregistered actions."""
-    import logging
+def test_startup_warns_unimplemented():
+    """Registry logs a warning for allowlisted but unregistered actions."""
     with patch("src.openclaw.actions.registry._load_allowlist_meta", return_value={}):
         from src.openclaw.actions.registry import ActionRegistry
-        import io, logging
-        # Capture log output
-        stream = io.StringIO()
+
+        stream  = io.StringIO()
         handler = logging.StreamHandler(stream)
-        logging.getLogger("openclaw.actions.registry").addHandler(handler)
+        reg_logger = logging.getLogger("openclaw.actions.registry")
+        reg_logger.addHandler(handler)
+        reg_logger.setLevel(logging.WARNING)
 
-        r = ActionRegistry(allowlist=["nonexistent_action"], dry_run=True)
+        ActionRegistry(allowlist=["nonexistent_action"], dry_run=True)
+
+        reg_logger.removeHandler(handler)
         log_output = stream.getvalue()
-
-        logging.getLogger("openclaw.actions.registry").removeHandler(handler)
-        assert "nonexistent_action" in log_output or True  # warning emitted internally
+        assert "nonexistent_action" in log_output
