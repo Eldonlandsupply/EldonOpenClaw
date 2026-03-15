@@ -3,9 +3,7 @@ Tests for ActionRegistry risk-score and execution_mode enforcement.
 """
 from __future__ import annotations
 
-import io
 import logging
-
 import pytest
 from unittest.mock import patch
 
@@ -92,19 +90,12 @@ async def test_unknown_action_no_meta_still_works(registry_with_meta):
     assert "test" in str(result.output)
 
 
-def test_startup_warns_unimplemented():
+def test_startup_warns_unimplemented(caplog):
     """Registry logs a warning for allowlisted but unregistered actions."""
     with patch("src.openclaw.actions.registry._load_allowlist_meta", return_value={}):
-        from src.openclaw.actions.registry import ActionRegistry
+        # caplog must be set before the registry is created so it captures the warning
+        with caplog.at_level(logging.WARNING, logger="openclaw.actions.registry"):
+            from src.openclaw.actions.registry import ActionRegistry
+            ActionRegistry(allowlist=["nonexistent_action"], dry_run=True)
 
-        stream  = io.StringIO()
-        handler = logging.StreamHandler(stream)
-        reg_logger = logging.getLogger("openclaw.actions.registry")
-        reg_logger.addHandler(handler)
-        reg_logger.setLevel(logging.WARNING)
-
-        ActionRegistry(allowlist=["nonexistent_action"], dry_run=True)
-
-        reg_logger.removeHandler(handler)
-        log_output = stream.getvalue()
-        assert "nonexistent_action" in log_output
+    assert "nonexistent_action" in caplog.text
