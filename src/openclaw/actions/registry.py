@@ -143,7 +143,8 @@ class ActionRegistry:
         ]
         if missing:
             logger.warning(
-                "Allowlisted actions have no registered handler — they will fail at dispatch",
+                "Allowlisted actions have no registered handler and will fail at dispatch: %s",
+                ", ".join(sorted(missing)),
                 extra={"unimplemented": missing, "count": len(missing)},
             )
 
