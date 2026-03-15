@@ -40,5 +40,6 @@ jobs:
 
       - name: Golden-path config check
         env:
+          PYTHONPATH: src
           OPENCLAW_CHAT_MODEL: gpt-golden-path-test
         run: python scripts/doctor.py
