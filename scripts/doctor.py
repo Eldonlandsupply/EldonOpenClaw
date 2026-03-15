@@ -3,13 +3,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# Support running as `python scripts/doctor.py` from repo root
-# with or without PYTHONPATH=src in the environment.
+# Ensure src/ is on the path when run as `python scripts/doctor.py`
+# from the repo root, with or without PYTHONPATH=src set.
 _repo_src = Path(__file__).resolve().parent.parent / "src"
 if str(_repo_src) not in sys.path:
     sys.path.insert(0, str(_repo_src))
 
-from config.loader import load_settings
+from config.loader import load_settings  # noqa: E402
 
 
 def main() -> None:
