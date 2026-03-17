@@ -41,5 +41,7 @@ jobs:
       - name: Golden-path config check
         env:
           PYTHONPATH: src
+          # Use provider=none so no API key is required in CI
+          LLM_PROVIDER: none
           OPENCLAW_CHAT_MODEL: gpt-golden-path-test
         run: python scripts/doctor.py

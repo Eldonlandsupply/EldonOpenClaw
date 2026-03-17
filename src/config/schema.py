@@ -1,7 +1,18 @@
+"""
+src/config/schema.py
+
+DEPRECATED — superseded by src/openclaw/config.AppConfig.
+
+This Pydantic Settings model was created in parallel with the runtime config
+and was never unified with it. It is kept for reference only.
+
+DO NOT use this for new code. The live runtime uses openclaw.config.AppConfig.
+"""
 from __future__ import annotations
 
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
+
 
 PLACEHOLDER_VALUES = {"YOUR_CHAT_MODEL", "YOUR_EMBED_MODEL", "CHANGE_ME", "TODO"}
 

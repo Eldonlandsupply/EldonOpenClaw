@@ -1,7 +1,10 @@
 """
 tests/test_config.py
-Tests for config loader and schema validation.
-No network. No real API keys.
+Tests for the canonical runtime config system (src/openclaw/config.AppConfig).
+
+This is the single authoritative config test suite. The previous version
+tested src/config/schema.py (Settings), a separate system that is now
+deprecated. These tests cover the config the live process actually uses.
 """
 from __future__ import annotations
 
@@ -9,147 +12,209 @@ import textwrap
 from pathlib import Path
 
 import pytest
-
-# Ensure project root is on path when running pytest from repo root
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from src.config.loader import load_settings
+from openclaw.config import AppConfig, reset_config
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────
-
-def write_config(tmp_path: Path, content: str) -> Path:
+def write_yaml(tmp_path: Path, content: str) -> Path:
     p = tmp_path / "config.yaml"
     p.write_text(textwrap.dedent(content))
     return p
 
 
+@pytest.fixture(autouse=True)
+def clear_config():
+    reset_config()
+    yield
+    reset_config()
+
+
 # ── Happy path ─────────────────────────────────────────────────────────────
 
-def test_minimal_valid_config(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENCLAW_CHAT_MODEL", "gpt-test")
-    cfg = write_config(tmp_path, """
+def test_minimal_valid_config(tmp_path):
+    p = write_yaml(tmp_path, """
         llm:
-          chat_model: ${OPENCLAW_CHAT_MODEL}
+          provider: none
+          chat_model: gpt-test
     """)
-    s = load_settings(str(cfg))
-    assert s.llm.chat_model == "gpt-test"
-    assert s.llm.embedding_model is None
-    assert s.memory.enabled is False
-    assert s.connectors.cli is True
+    cfg = AppConfig(yaml_path=str(p))
+    assert cfg.llm.chat_model == "gpt-test"
+    assert cfg.llm.provider == "none"
+    assert cfg.runtime.dry_run is True
+    assert cfg.connectors.cli.enabled is True
+    assert cfg.connectors.telegram.enabled is False
 
 
-def test_memory_enabled_with_embed_model(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENCLAW_CHAT_MODEL", "gpt-test")
-    monkeypatch.setenv("OPENCLAW_EMBED_MODEL", "text-embedding-3-small")
-    cfg = write_config(tmp_path, """
+def test_env_var_expansion(tmp_path, monkeypatch):
+    monkeypatch.setenv("TEST_MODEL", "gpt-expanded")
+    p = write_yaml(tmp_path, """
         llm:
-          chat_model: ${OPENCLAW_CHAT_MODEL}
-          embedding_model: ${OPENCLAW_EMBED_MODEL}
-        memory:
-          enabled: true
+          provider: none
+          chat_model: ${TEST_MODEL:fallback}
     """)
-    s = load_settings(str(cfg))
-    assert s.memory.enabled is True
-    assert s.llm.embedding_model == "text-embedding-3-small"
+    cfg = AppConfig(yaml_path=str(p))
+    assert cfg.llm.chat_model == "gpt-expanded"
 
 
-def test_base_url_empty_becomes_none(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENCLAW_CHAT_MODEL", "gpt-test")
-    cfg = write_config(tmp_path, """
+def test_env_var_default_used_when_missing(tmp_path, monkeypatch):
+    monkeypatch.delenv("TEST_MODEL", raising=False)
+    p = write_yaml(tmp_path, """
         llm:
-          chat_model: ${OPENCLAW_CHAT_MODEL}
-          base_url: ${OPENAI_BASE_URL:}
+          provider: none
+          chat_model: ${TEST_MODEL:fallback-model}
     """)
-    s = load_settings(str(cfg))
-    assert s.llm.base_url is None
+    cfg = AppConfig(yaml_path=str(p))
+    assert cfg.llm.chat_model == "fallback-model"
 
 
-def test_base_url_set(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENCLAW_CHAT_MODEL", "gpt-test")
-    monkeypatch.setenv("OPENAI_BASE_URL", "http://localhost:11434/v1")
-    cfg = write_config(tmp_path, """
+def test_dry_run_false(tmp_path):
+    p = write_yaml(tmp_path, """
         llm:
-          chat_model: ${OPENCLAW_CHAT_MODEL}
-          base_url: ${OPENAI_BASE_URL:}
+          provider: none
+          chat_model: gpt-test
+        runtime:
+          dry_run: false
     """)
-    s = load_settings(str(cfg))
-    assert s.llm.base_url == "http://localhost:11434/v1"
+    cfg = AppConfig(yaml_path=str(p))
+    assert cfg.runtime.dry_run is False
 
 
-# ── Fail-fast: missing chat_model ──────────────────────────────────────────
-
-def test_missing_chat_model_raises(tmp_path, monkeypatch):
-    monkeypatch.delenv("OPENCLAW_CHAT_MODEL", raising=False)
-    cfg = write_config(tmp_path, """
+def test_dry_run_defaults_true(tmp_path):
+    p = write_yaml(tmp_path, """
         llm:
-          chat_model: ${OPENCLAW_CHAT_MODEL}
+          provider: none
+          chat_model: gpt-test
     """)
-    with pytest.raises(RuntimeError, match="validation failed"):
-        load_settings(str(cfg))
+    cfg = AppConfig(yaml_path=str(p))
+    assert cfg.runtime.dry_run is True
 
 
-def test_placeholder_chat_model_raises(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENCLAW_CHAT_MODEL", "YOUR_CHAT_MODEL")
-    cfg = write_config(tmp_path, """
+def test_health_defaults(tmp_path):
+    p = write_yaml(tmp_path, """
         llm:
-          chat_model: ${OPENCLAW_CHAT_MODEL}
+          provider: none
+          chat_model: gpt-test
     """)
-    with pytest.raises(RuntimeError, match="placeholder"):
-        load_settings(str(cfg))
+    cfg = AppConfig(yaml_path=str(p))
+    assert cfg.health.enabled is True
+    assert cfg.health.port == 8080
 
 
-# ── Fail-fast: memory enabled without embed model ──────────────────────────
-
-def test_memory_enabled_without_embed_model_raises(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENCLAW_CHAT_MODEL", "gpt-test")
-    monkeypatch.delenv("OPENCLAW_EMBED_MODEL", raising=False)
-    cfg = write_config(tmp_path, """
+def test_connector_bool_shorthand(tmp_path):
+    p = write_yaml(tmp_path, """
         llm:
-          chat_model: ${OPENCLAW_CHAT_MODEL}
-          embedding_model: ${OPENCLAW_EMBED_MODEL:}
-        memory:
-          enabled: true
-    """)
-    with pytest.raises(RuntimeError, match="embedding_model"):
-        load_settings(str(cfg))
-
-
-# ── Fail-fast: bad log level ───────────────────────────────────────────────
-
-def test_invalid_log_level_raises(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENCLAW_CHAT_MODEL", "gpt-test")
-    cfg = write_config(tmp_path, """
-        app:
-          log_level: verbose
-        llm:
-          chat_model: ${OPENCLAW_CHAT_MODEL}
-    """)
-    with pytest.raises(RuntimeError, match="validation failed"):
-        load_settings(str(cfg))
-
-
-# ── Fail-fast: missing config file ────────────────────────────────────────
-
-def test_missing_config_file_raises():
-    with pytest.raises(RuntimeError, match="not found"):
-        load_settings("/nonexistent/config.yaml")
-
-
-# ── Connector flags parse correctly ───────────────────────────────────────
-
-def test_connectors_from_env(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENCLAW_CHAT_MODEL", "gpt-test")
-    monkeypatch.setenv("OPENCLAW_CONNECTOR_TELEGRAM", "true")
-    cfg = write_config(tmp_path, """
-        llm:
-          chat_model: ${OPENCLAW_CHAT_MODEL}
+          provider: none
+          chat_model: gpt-test
         connectors:
-          cli: ${OPENCLAW_CONNECTOR_CLI:true}
-          telegram: ${OPENCLAW_CONNECTOR_TELEGRAM:false}
-          voice: ${OPENCLAW_CONNECTOR_VOICE:false}
+          cli: true
+          telegram: false
     """)
-    s = load_settings(str(cfg))
-    assert s.connectors.telegram is True
-    assert s.connectors.voice is False
+    cfg = AppConfig(yaml_path=str(p))
+    assert cfg.connectors.cli.enabled is True
+    assert cfg.connectors.telegram.enabled is False
+
+
+def test_connector_telegram_enabled(tmp_path, monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
+    p = write_yaml(tmp_path, """
+        llm:
+          provider: none
+          chat_model: gpt-test
+        connectors:
+          telegram: true
+    """)
+    cfg = AppConfig(yaml_path=str(p))
+    assert cfg.connectors.telegram.enabled is True
+
+
+def test_summary_redacts_secrets(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-secret-key")
+    p = write_yaml(tmp_path, """
+        llm:
+          provider: openrouter
+          chat_model: test-model
+    """)
+    cfg = AppConfig(yaml_path=str(p))
+    summary = cfg.summary()
+    assert summary["secrets"]["openrouter_api_key"] == "SET"
+    assert "sk-secret-key" not in str(summary)
+
+
+def test_actions_require_confirm_both_spellings(tmp_path):
+    p = write_yaml(tmp_path, """
+        llm:
+          provider: none
+          chat_model: gpt-test
+        actions:
+          require_confirmation: true
+    """)
+    cfg = AppConfig(yaml_path=str(p))
+    assert cfg.actions.require_confirm is True
+
+    reset_config()
+    sub = tmp_path / "b"
+    sub.mkdir()
+    p2 = write_yaml(sub, """
+        llm:
+          provider: none
+          chat_model: gpt-test
+        actions:
+          require_confirm: false
+    """)
+    cfg2 = AppConfig(yaml_path=str(p2))
+    assert cfg2.actions.require_confirm is False
+
+
+# ── Fail-fast ──────────────────────────────────────────────────────────────
+
+def test_missing_config_file_exits():
+    with pytest.raises(SystemExit):
+        AppConfig(yaml_path="/nonexistent/config.yaml")
+
+
+def test_invalid_provider_exits(tmp_path):
+    p = write_yaml(tmp_path, """
+        llm:
+          provider: fakeprovider
+          chat_model: gpt-test
+    """)
+    with pytest.raises(SystemExit):
+        AppConfig(yaml_path=str(p))
+
+
+def test_invalid_log_level_exits(tmp_path):
+    p = write_yaml(tmp_path, """
+        llm:
+          provider: none
+          chat_model: gpt-test
+        runtime:
+          log_level: verbose
+    """)
+    with pytest.raises(SystemExit):
+        AppConfig(yaml_path=str(p))
+
+
+def test_openrouter_without_key_exits(tmp_path, monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    p = write_yaml(tmp_path, """
+        llm:
+          provider: openrouter
+          chat_model: openai/gpt-4o-mini
+    """)
+    with pytest.raises(SystemExit):
+        AppConfig(yaml_path=str(p))
+
+
+def test_telegram_enabled_without_token_exits(tmp_path, monkeypatch):
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    p = write_yaml(tmp_path, """
+        llm:
+          provider: none
+          chat_model: gpt-test
+        connectors:
+          telegram: true
+    """)
+    with pytest.raises(SystemExit):
+        AppConfig(yaml_path=str(p))
