@@ -5,6 +5,14 @@ Endpoints:
   GET /health  — full status JSON
   GET /ready   — 200 if ready, 503 if not
   GET /ping    — always 200 "pong"
+
+Fix (2026-03-17):
+  - Added reset_health() so SIGHUP reload cycles start with clean state.
+    Without this, _degraded / _connector_status from a previous run carry
+    over and produce false-degraded readings after reload.
+  - start_health_server() is now idempotent: a second call is a no-op so
+    reload does not attempt to bind the same port twice (which would throw
+    OSError and crash the reload cycle).
 """
 
 from __future__ import annotations
@@ -27,6 +35,21 @@ _degraded:          bool              = False
 _degraded_reason:   str               = ""
 _max_stale_seconds: int               = 60
 _connector_status:  dict[str, str]    = {}   # name → "ok" | "degraded"
+_server_started:    bool              = False  # FIXED: guard against double-bind
+
+
+def reset_health() -> None:
+    """Reset mutable health state for a fresh reload cycle.
+
+    Call this at the start of each run() cycle so SIGHUP reloads do not
+    carry degraded flags or stale connector status from the previous cycle.
+    Does NOT reset _start_time (uptime is cumulative across reloads).
+    """
+    global _last_tick, _degraded, _degraded_reason, _connector_status
+    _last_tick        = None
+    _degraded         = False
+    _degraded_reason  = ""
+    _connector_status = {}
 
 
 def record_tick() -> None:
@@ -88,6 +111,17 @@ async def _handle_ping(request: web.Request) -> web.Response:
 
 
 async def start_health_server(host: str, port: int) -> None:
+    """Start the health server. Idempotent — second call is a no-op.
+
+    On SIGHUP reload, run() calls this again. Without the guard the second
+    bind attempt throws OSError (address already in use) and crashes the
+    reload cycle. The existing server continues serving across reloads.
+    """
+    global _server_started
+    if _server_started:
+        logger.info("health server already running — skipping rebind",
+                    extra={"host": host, "port": port})
+        return
     app = web.Application()
     app.router.add_get("/health", _handle_health)
     app.router.add_get("/ready",  _handle_ready)
@@ -96,6 +130,7 @@ async def start_health_server(host: str, port: int) -> None:
     await runner.setup()
     site = web.TCPSite(runner, host, port)
     await site.start()
+    _server_started = True
     logger.info("health server started",
                 extra={"host": host, "port": port,
                        "endpoints": ["/health", "/ready", "/ping"]})

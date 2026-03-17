@@ -4,11 +4,12 @@ OpenClaw main async loop.
 Boot sequence:
   1. Load config (fatal on misconfiguration)
   2. Configure structured logging
-  3. Init memory
-  4. Start health server
-  5. Init chat client
-  6. Start connectors
-  7. Run main tick loop + message dispatch loop
+  3. Reset health state (clean slate per cycle — fixes stale degraded on reload)
+  4. Init memory
+  5. Start health server
+  6. Init chat client
+  7. Start connectors
+  8. Run main tick loop + message dispatch loop
 
 Signals:
   SIGINT / SIGTERM  — graceful shutdown
@@ -36,7 +37,7 @@ from openclaw.actions.registry import ActionRegistry
 from openclaw.chat.client import ChatClient
 from openclaw.config import get_config, reset_config
 from openclaw.connectors.cli import CLIConnector
-from openclaw.health import mark_degraded, record_tick, start_health_server
+from openclaw.health import mark_degraded, record_tick, reset_health, start_health_server
 from openclaw.logging import configure_logging, get_logger
 from openclaw.memory.sqlite import SQLiteMemory
 
@@ -272,6 +273,10 @@ async def run(yaml_path: str = "config.yaml") -> bool:
     cfg = get_config(yaml_path)
     configure_logging(cfg.runtime.log_level)
 
+    # FIXED: reset health state so stale degraded flags from previous cycle
+    # do not persist across SIGHUP reloads.
+    reset_health()
+
     logger.info(
         "openclaw starting",
         extra={"version": __version__, "config": cfg.summary()},
@@ -311,6 +316,7 @@ async def run(yaml_path: str = "config.yaml") -> bool:
 
     # ── Health server ─────────────────────────────────────────────────────
     if cfg.health.enabled:
+        # start_health_server is idempotent — safe to call on every reload
         await start_health_server(cfg.health.host, cfg.health.port)
 
     # ── Shared infrastructure ─────────────────────────────────────────────

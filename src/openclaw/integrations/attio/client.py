@@ -1,11 +1,14 @@
 """
 Attio REST API client.
 Thin async wrapper — no third-party SDK required.
+
+Fix (2026-03-17): Use json= kwarg in aiohttp POST/PATCH calls instead of
+data=json.dumps(). Both work when Content-Type is set via session headers,
+but json= is the correct aiohttp pattern and avoids encoding edge cases.
 """
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import aiohttp
@@ -43,13 +46,13 @@ class AttioClient:
 
     async def _post(self, path: str, body: dict) -> Any:
         session = self._session_or_create()
-        async with session.post(f"{BASE_URL}{path}", data=json.dumps(body)) as resp:
+        async with session.post(f"{BASE_URL}{path}", json=body) as resp:  # FIXED: json= not data=
             resp.raise_for_status()
             return await resp.json()
 
     async def _patch(self, path: str, body: dict) -> Any:
         session = self._session_or_create()
-        async with session.patch(f"{BASE_URL}{path}", data=json.dumps(body)) as resp:
+        async with session.patch(f"{BASE_URL}{path}", json=body) as resp:  # FIXED: json= not data=
             resp.raise_for_status()
             return await resp.json()
 
@@ -87,7 +90,7 @@ class AttioClient:
     async def _put_upsert(self, object_type: str, matching_attribute: str, body: dict) -> Any:
         session = self._session_or_create()
         url = f"{BASE_URL}/objects/{object_type}/records?matching_attribute={matching_attribute}"
-        async with session.put(url, data=json.dumps(body)) as resp:
+        async with session.put(url, json=body) as resp:  # FIXED: json= not data=
             resp.raise_for_status()
             return await resp.json()
 

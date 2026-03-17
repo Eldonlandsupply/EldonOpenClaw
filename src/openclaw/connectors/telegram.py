@@ -1,6 +1,9 @@
 """
 Telegram connector — polls getUpdates, emits Message objects, sends replies.
 No external library required; uses aiohttp (already a dep via health server).
+
+Fix (2026-03-17): Store poll task handle so stop() can cancel it cleanly,
+preventing orphaned tasks and post-close session access errors.
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ class TelegramConnector(BaseConnector):
         self._running = False
         self._offset = 0
         self._session: aiohttp.ClientSession | None = None
+        self._poll_task: asyncio.Task | None = None  # FIXED: store handle for clean cancel
 
     def _url(self, method: str) -> str:
         return _API.format(token=self._token, method=method)
@@ -41,7 +45,7 @@ class TelegramConnector(BaseConnector):
     async def start(self) -> None:
         self._session = aiohttp.ClientSession()
         self._running = True
-        asyncio.create_task(self._poll_loop())
+        self._poll_task = asyncio.create_task(self._poll_loop())  # FIXED: store task
         logger.info("Telegram connector started", extra={"allowed_chat_ids": list(self._allowed)})
 
     async def _poll_loop(self) -> None:
@@ -101,6 +105,15 @@ class TelegramConnector(BaseConnector):
             logger.warning("Telegram send error", extra={"error": str(exc)})
 
     async def stop(self) -> None:
+        """Cancel poll task first, then close session. Order matters."""
         self._running = False
+        if self._poll_task and not self._poll_task.done():
+            self._poll_task.cancel()
+            try:
+                await self._poll_task
+            except asyncio.CancelledError:
+                pass
+        self._poll_task = None
         if self._session:
             await self._session.close()
+            self._session = None

@@ -1,6 +1,10 @@
 """
 Gmail connector — polls IMAP for unread messages, sends replies via SMTP SSL.
 Uses only stdlib: imaplib, smtplib, email.
+
+Fix (2026-03-17): Store poll task handle so stop() can cancel it cleanly.
+Also removed stale self._loop storage pattern — asyncio.get_event_loop() is
+deprecated; call_soon_threadsafe with the queue is sufficient.
 """
 from __future__ import annotations
 
@@ -31,23 +35,34 @@ class GmailConnector(BaseConnector):
         self._poll_interval = poll_interval
         self._queue: asyncio.Queue = asyncio.Queue()
         self._running = False
-        self._loop: asyncio.AbstractEventLoop | None = None
+        self._poll_task: asyncio.Task | None = None  # FIXED: store handle for clean cancel
 
     async def start(self) -> None:
         self._running = True
-        self._loop = asyncio.get_running_loop()
-        asyncio.create_task(self._poll_loop())
+        self._poll_task = asyncio.create_task(self._poll_loop())  # FIXED: store task
         logger.info("Gmail connector started", extra={"user": self._user})
 
     async def _poll_loop(self) -> None:
+        loop = asyncio.get_running_loop()
         while self._running:
             try:
-                await self._loop.run_in_executor(None, self._fetch_unread)
+                await loop.run_in_executor(None, self._fetch_unread)
+            except asyncio.CancelledError:
+                break
             except Exception as exc:
                 logger.warning("Gmail poll error", extra={"error": str(exc)})
-            await asyncio.sleep(self._poll_interval)
+            try:
+                await asyncio.wait_for(
+                    asyncio.shield(asyncio.sleep(self._poll_interval)),
+                    timeout=self._poll_interval,
+                )
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                if not self._running:
+                    break
 
     def _fetch_unread(self) -> None:
+        # Capture the running loop for threadsafe queue put
+        loop = asyncio.get_event_loop()
         with imaplib.IMAP4_SSL("imap.gmail.com") as imap:
             imap.login(self._user, self._password)
             imap.select("INBOX")
@@ -67,8 +82,8 @@ class GmailConnector(BaseConnector):
                 else:
                     body = msg.get_payload(decode=True).decode(errors="replace")
                 text = f"[Email from {sender}] Subject: {subject}\n{body.strip()}"
-                if self._loop and not self._loop.is_closed():
-                    self._loop.call_soon_threadsafe(
+                if not loop.is_closed():
+                    loop.call_soon_threadsafe(
                         self._queue.put_nowait,
                         Message(text=text, source="gmail", chat_id=sender),
                     )
@@ -84,11 +99,11 @@ class GmailConnector(BaseConnector):
                     return
 
     async def send(self, chat_id: str | None, text: str) -> None:  # replies disabled
-        logger.info('Gmail reply suppressed (auth not configured)', extra={'to': chat_id})
+        logger.info("Gmail reply suppressed (auth not configured)", extra={"to": chat_id})
         return
+
     async def _send_disabled(self, chat_id: str | None, text: str) -> None:
         to = chat_id or self._user
-        # Extract plain email from "Name <email>" format
         if "<" in to and ">" in to:
             to = to.split("<")[1].rstrip(">")
         loop = asyncio.get_running_loop()
@@ -105,4 +120,12 @@ class GmailConnector(BaseConnector):
         logger.info("Gmail sent", extra={"to": to})
 
     async def stop(self) -> None:
+        """Cancel poll task cleanly before exit."""
         self._running = False
+        if self._poll_task and not self._poll_task.done():
+            self._poll_task.cancel()
+            try:
+                await self._poll_task
+            except asyncio.CancelledError:
+                pass
+        self._poll_task = None

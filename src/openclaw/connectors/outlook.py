@@ -11,6 +11,9 @@ from openclaw.logging import get_logger
 logger = get_logger(__name__)
 _GRAPH = "https://graph.microsoft.com/v1.0"
 
+# Fix (2026-03-17): Store poll task handle so stop() can cancel it cleanly,
+# preventing orphaned tasks after shutdown/reload.
+
 class OutlookConnector(BaseConnector):
     name = "outlook"
 
@@ -25,11 +28,12 @@ class OutlookConnector(BaseConnector):
         self._token = None
         self._token_expiry = 0.0
         self._session = None
+        self._poll_task: asyncio.Task | None = None  # FIXED: store handle
 
     async def start(self):
         self._session = aiohttp.ClientSession()
         self._running = True
-        asyncio.create_task(self._poll_loop())
+        self._poll_task = asyncio.create_task(self._poll_loop())  # FIXED: store task
         logger.info("Outlook connector started", extra={"user": self._user})
 
     async def _get_token(self):
@@ -67,6 +71,8 @@ class OutlookConnector(BaseConnector):
                     await self._queue.put(Message(text=text, source="outlook", chat_id=sender))
                     patch_url = f"{_GRAPH}/users/{self._user}/messages/{msg_id}"
                     await self._session.patch(patch_url, headers=headers, json={"isRead": True})
+            except asyncio.CancelledError:
+                break
             except Exception as exc:
                 logger.warning("Outlook poll error", extra={"error": str(exc)})
             await asyncio.sleep(self._poll_interval)
@@ -81,8 +87,9 @@ class OutlookConnector(BaseConnector):
                     return
 
     async def send(self, chat_id, text):  # replies disabled
-        logger.info('Outlook reply suppressed (auth not configured)', extra={'to': chat_id})
+        logger.info("Outlook reply suppressed (auth not configured)", extra={"to": chat_id})
         return
+
     async def _send_disabled(self, chat_id, text):
         if not chat_id or not self._session:
             return
@@ -102,6 +109,15 @@ class OutlookConnector(BaseConnector):
             logger.warning("Outlook send error", extra={"error": str(exc)})
 
     async def stop(self):
+        """Cancel poll task first, then close session."""
         self._running = False
+        if self._poll_task and not self._poll_task.done():
+            self._poll_task.cancel()
+            try:
+                await self._poll_task
+            except asyncio.CancelledError:
+                pass
+        self._poll_task = None
         if self._session:
             await self._session.close()
+            self._session = None
