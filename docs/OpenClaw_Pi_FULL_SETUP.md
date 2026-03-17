@@ -1,3 +1,7 @@
+<!-- ⚠️ SECURITY NOTE: This document contains placeholder values only.
+     Never commit real credentials to this file.
+     Store all secrets in /etc/openclaw/openclaw.env (not tracked by git). -->
+
 # OpenClaw — Full Raspberry Pi Setup
 ## From Blank SD Card to Running 24/7 Service
 ### Every single step. No gaps. No assumptions.
@@ -364,14 +368,14 @@ sudo nano /etc/openclaw/openclaw.env
 Paste in exactly the following — these are your real credentials:
 
 ```
-OPENROUTER_API_KEY=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
+OPENROUTER_API_KEY=sk-or-v1-YOUR_OPENROUTER_KEY_HERE
 SQLITE_PATH=/var/lib/openclaw/openclaw.db
 AZURE_TENANT_ID=5afeb96a-473a-4650-81f7-4c61f3bf3461
 AZURE_CLIENT_ID=a1c063c0-eefb-465d-90c2-d3eca184d33f
-AZURE_CLIENT_SECRET=2acf5611-26fd-4620-907b-bcaffd8d20c6
-GMAIL_USER=Matthew.tynski@gmail.com
-GMAIL_APP_PASSWORD=ffap povw pdnf zxcp
-NOTIFICATION_EMAIL=Matthew.tynski@ou.edu
+AZURE_CLIENT_SECRET=YOUR_AZURE_CLIENT_SECRET
+GMAIL_USER=YOUR_GMAIL_USER
+GMAIL_APP_PASSWORD=YOUR_GMAIL_APP_PASSWORD
+NOTIFICATION_EMAIL=YOUR_NOTIFICATION_EMAIL
 ```
 
 Save: Ctrl+X → Y → Enter

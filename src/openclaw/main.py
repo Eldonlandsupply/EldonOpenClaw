@@ -41,8 +41,20 @@ from openclaw.logging import configure_logging, get_logger
 from openclaw.memory.sqlite import SQLiteMemory
 
 logger = get_logger(__name__)
-_shutdown = asyncio.Event()
-_reload   = asyncio.Event()
+
+# Module-level shutdown/reload events.
+# IMPORTANT: These are recreated on each reload cycle to avoid stale state.
+# cli_entry() owns the top-level event loop; run() uses these for signalling.
+_shutdown: asyncio.Event
+_reload: asyncio.Event
+
+
+def _init_events() -> None:
+    """Create fresh event objects. Called once at startup and after each reload."""
+    global _shutdown, _reload
+    _shutdown = asyncio.Event()
+    _reload = asyncio.Event()
+
 
 # ── Deduplication ─────────────────────────────────────────────────────────
 
@@ -247,7 +259,16 @@ async def _message_loop(
 
 # ── Main ──────────────────────────────────────────────────────────────────
 
-async def run(yaml_path: str = "config.yaml") -> None:
+async def run(yaml_path: str = "config.yaml") -> bool:
+    """
+    Run one lifecycle of the OpenClaw runtime.
+
+    Returns True if a reload (SIGHUP) was requested, False if a clean
+    shutdown (SIGINT/SIGTERM) was requested. The caller (cli_entry) decides
+    whether to loop.
+    """
+    _init_events()
+
     cfg = get_config(yaml_path)
     configure_logging(cfg.runtime.log_level)
 
@@ -374,9 +395,10 @@ async def run(yaml_path: str = "config.yaml") -> None:
         return_when=asyncio.FIRST_COMPLETED,
     )
 
-    if _reload.is_set() and not _shutdown.is_set():
+    reload_requested = _reload.is_set() and not _shutdown.is_set()
+
+    if reload_requested:
         logger.info("SIGHUP received — reloading config")
-        _reload.clear()
 
     logger.info("shutting down")
     for t in tasks:
@@ -388,14 +410,17 @@ async def run(yaml_path: str = "config.yaml") -> None:
     await memory.close()
     logger.info("openclaw stopped cleanly")
 
-    if not _shutdown.is_set():
-        reset_config()
-        await run(yaml_path)
+    return reload_requested
 
 
 def cli_entry() -> None:
     yaml_path = sys.argv[1] if len(sys.argv) > 1 else "config.yaml"
-    asyncio.run(run(yaml_path=yaml_path))
+    while True:
+        reset_config()
+        should_reload = asyncio.run(run(yaml_path=yaml_path))
+        if not should_reload:
+            break
+        logger.info("restarting after reload")
 
 
 if __name__ == "__main__":

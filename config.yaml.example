@@ -2,29 +2,32 @@
 # EldonOpenClaw — config.yaml.example
 # Copy to config.yaml. Non-secrets only — secrets go in .env.
 # Supports ${VAR} and ${VAR:default} env substitution.
+#
+# IMPORTANT: Variable names here must match your .env file.
+# The canonical var names are listed in .env.example.
 # ============================================================
 
 llm:
-  # openai | openrouter | anthropic | none
+  # openai | openrouter | xai | none
   provider: ${LLM_PROVIDER:none}
-  chat_model: ${LLM_CHAT_MODEL:openai/gpt-4o-mini}
-  embedding_model: ${LLM_EMBED_MODEL:}
+  chat_model: ${OPENCLAW_CHAT_MODEL:openai/gpt-4o-mini}
+  embedding_model: ${OPENCLAW_EMBED_MODEL:}
+  base_url: ${OPENAI_BASE_URL:}
 
 runtime:
   tick_seconds: ${TICK_SECONDS:10}
-  log_level: ${LOG_LEVEL:INFO}
+  log_level: ${OPENCLAW_LOG_LEVEL:INFO}
   data_dir: ${DATA_DIR:./data}
   # IMPORTANT: set to false when ready for live operation
   dry_run: ${DRY_RUN:true}
 
 connectors:
-  cli:
-    enabled: ${CONNECTOR_CLI:true}
-  telegram:
-    enabled: ${CONNECTOR_TELEGRAM:false}
+  cli: ${OPENCLAW_CONNECTOR_CLI:true}
+  telegram: ${OPENCLAW_CONNECTOR_TELEGRAM:false}
+  voice: ${OPENCLAW_CONNECTOR_VOICE:false}
 
 actions:
-  require_confirm: ${ACTION_CONFIRM:false}
+  require_confirm: ${OPENCLAW_ACTION_CONFIRM:false}
   allowlist:
     - echo
     - memory_write
