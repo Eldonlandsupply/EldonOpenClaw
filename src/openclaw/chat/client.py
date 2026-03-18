@@ -6,10 +6,12 @@ Async LLM chat client with:
   - System prompt loaded from config (config.llm.system_prompt or default)
   - Rate-limiting stub via configurable max_requests_per_minute
   - Injection pattern detection with warning log
+  - 2-attempt retry with 3s backoff for transient network errors (Pi reliability)
 Supports OpenRouter, OpenAI, and xAI (Grok).
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import time
@@ -53,6 +55,9 @@ _PROVIDER_BASE_URLS: dict[str, str] = {
     "openai":     "https://api.openai.com/v1",
     "xai":        "https://api.x.ai/v1",
 }
+
+_RETRY_ATTEMPTS = 2
+_RETRY_DELAY_S  = 3.0
 
 
 class ChatClient:
@@ -135,7 +140,7 @@ class ChatClient:
         self._trim_history()
 
         try:
-            reply = await self._call_api()
+            reply = await self._call_api_with_retry()
         except Exception as exc:
             logger.error("ChatClient error: %s", exc)
             self._history.pop()
@@ -167,6 +172,44 @@ class ChatClient:
                 headers["X-Title"]      = "OpenClaw"
             self._session = aiohttp.ClientSession(headers=headers)
         return self._session
+
+    async def _call_api_with_retry(self) -> str:
+        """Call the LLM API with up to _RETRY_ATTEMPTS attempts on transient errors.
+
+        Retry covers: connection errors, timeouts, and HTTP 5xx responses.
+        HTTP 4xx (bad request, auth failure) are not retried — they are
+        config/key errors that will not resolve on retry.
+        """
+        last_exc: Exception | None = None
+        for attempt in range(1, _RETRY_ATTEMPTS + 1):
+            try:
+                return await self._call_api()
+            except aiohttp.ClientConnectorError as exc:
+                last_exc = exc
+                logger.warning(
+                    "LLM connection error (attempt %d/%d): %s",
+                    attempt, _RETRY_ATTEMPTS, exc,
+                )
+            except asyncio.TimeoutError as exc:
+                last_exc = exc
+                logger.warning(
+                    "LLM timeout (attempt %d/%d)",
+                    attempt, _RETRY_ATTEMPTS,
+                )
+            except RuntimeError as exc:
+                # Only retry on 5xx; re-raise 4xx immediately
+                msg = str(exc)
+                if "HTTP 5" in msg:
+                    last_exc = exc
+                    logger.warning(
+                        "LLM HTTP 5xx (attempt %d/%d): %s",
+                        attempt, _RETRY_ATTEMPTS, msg[:120],
+                    )
+                else:
+                    raise
+            if attempt < _RETRY_ATTEMPTS:
+                await asyncio.sleep(_RETRY_DELAY_S)
+        raise last_exc  # type: ignore[misc]
 
     async def _call_api(self) -> str:
         messages = [{"role": "system", "content": self._system_prompt}] + self._history

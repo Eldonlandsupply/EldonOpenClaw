@@ -119,3 +119,79 @@ async def test_reset_clears_history():
     client.reset()
     assert client._history == []
     await client.close()
+
+# ── Retry logic ───────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_retry_on_connection_error():
+    """ChatClient must retry on ClientConnectorError and succeed on second attempt."""
+    import aiohttp
+    from unittest.mock import patch, AsyncMock
+    from src.openclaw.chat.client import ChatClient
+
+    client = ChatClient(make_cfg(provider="xai"))
+    client._api_key = "fake"
+
+    call_count = 0
+
+    async def fake_call():
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise aiohttp.ClientConnectorError(
+                connection_key=None, os_error=OSError("network down")
+            )
+        return "retried successfully"
+
+    with patch.object(client, "_call_api", side_effect=fake_call),          patch("src.openclaw.chat.client._RETRY_DELAY_S", 0):
+        reply = await client.chat("hello")
+
+    assert reply == "retried successfully"
+    assert call_count == 2
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_no_retry_on_4xx():
+    """ChatClient must NOT retry on 4xx errors (auth/config issue)."""
+    from unittest.mock import patch
+    from src.openclaw.chat.client import ChatClient
+
+    client = ChatClient(make_cfg(provider="xai"))
+    client._api_key = "fake"
+
+    call_count = 0
+
+    async def fake_call():
+        nonlocal call_count
+        call_count += 1
+        raise RuntimeError("HTTP 401: Unauthorized")
+
+    with patch.object(client, "_call_api", side_effect=fake_call),          patch("src.openclaw.chat.client._RETRY_DELAY_S", 0):
+        reply = await client.chat("hello")
+
+    assert "LLM error" in reply
+    assert call_count == 1, "4xx must not be retried"
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_retry_exhausted_returns_error():
+    """After all retries fail, chat() must return an error string, not raise."""
+    import aiohttp
+    from unittest.mock import patch
+    from src.openclaw.chat.client import ChatClient
+
+    client = ChatClient(make_cfg(provider="xai"))
+    client._api_key = "fake"
+
+    async def always_fail():
+        raise aiohttp.ClientConnectorError(
+            connection_key=None, os_error=OSError("network down")
+        )
+
+    with patch.object(client, "_call_api", side_effect=always_fail),          patch("src.openclaw.chat.client._RETRY_DELAY_S", 0):
+        reply = await client.chat("hello")
+
+    assert "LLM error" in reply
+    await client.close()

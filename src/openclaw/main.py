@@ -46,8 +46,13 @@ logger = get_logger(__name__)
 # Module-level shutdown/reload events.
 # IMPORTANT: These are recreated on each reload cycle to avoid stale state.
 # cli_entry() owns the top-level event loop; run() uses these for signalling.
-_shutdown: asyncio.Event
-_reload: asyncio.Event
+#
+# Initialized here (not just type-annotated) so that module-level imports of
+# these names work at test time without requiring _init_events() to be called
+# first. asyncio.Event() is safe to construct without a running event loop in
+# Python 3.10+ (it no longer captures the loop at creation time).
+_shutdown: asyncio.Event = asyncio.Event()
+_reload:   asyncio.Event = asyncio.Event()
 
 
 def _init_events() -> None:
