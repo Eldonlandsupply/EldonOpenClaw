@@ -138,9 +138,7 @@ async def test_retry_on_connection_error():
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            raise aiohttp.ClientConnectorError(
-                connection_key=None, os_error=OSError("network down")
-            )
+            raise aiohttp.ClientConnectionError("network down")
         return "retried successfully"
 
     with patch.object(client, "_call_api", side_effect=fake_call),          patch("src.openclaw.chat.client._RETRY_DELAY_S", 0):
@@ -186,9 +184,7 @@ async def test_retry_exhausted_returns_error():
     client._api_key = "fake"
 
     async def always_fail():
-        raise aiohttp.ClientConnectorError(
-            connection_key=None, os_error=OSError("network down")
-        )
+        raise aiohttp.ClientConnectionError("network down")
 
     with patch.object(client, "_call_api", side_effect=always_fail),          patch("src.openclaw.chat.client._RETRY_DELAY_S", 0):
         reply = await client.chat("hello")

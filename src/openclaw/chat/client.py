@@ -184,7 +184,7 @@ class ChatClient:
         for attempt in range(1, _RETRY_ATTEMPTS + 1):
             try:
                 return await self._call_api()
-            except aiohttp.ClientConnectorError as exc:
+            except aiohttp.ClientConnectionError as exc:  # catches connector + other connection failures
                 last_exc = exc
                 logger.warning(
                     "LLM connection error (attempt %d/%d): %s",
