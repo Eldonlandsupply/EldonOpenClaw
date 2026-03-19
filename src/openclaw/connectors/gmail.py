@@ -33,11 +33,12 @@ class GmailConnector(BaseConnector):
         self._user = user
         self._password = app_password
         self._poll_interval = poll_interval
-        self._queue: asyncio.Queue = asyncio.Queue()
+        self._queue: asyncio.Queue | None = None
         self._running = False
         self._poll_task: asyncio.Task | None = None  # FIXED: store handle for clean cancel
 
     async def start(self) -> None:
+        self._queue = asyncio.Queue()  # FIXED: create inside running loop
         self._running = True
         self._poll_task = asyncio.create_task(self._poll_loop())  # FIXED: store task
         logger.info("Gmail connector started", extra={"user": self._user})
