@@ -46,7 +46,7 @@ class GmailConnector(BaseConnector):
         loop = asyncio.get_running_loop()
         while self._running:
             try:
-                await loop.run_in_executor(None, self._fetch_unread)
+                await loop.run_in_executor(None, self._fetch_unread, loop)
             except asyncio.CancelledError:
                 break
             except Exception as exc:
@@ -60,9 +60,7 @@ class GmailConnector(BaseConnector):
                 if not self._running:
                     break
 
-    def _fetch_unread(self) -> None:
-        # Capture the running loop for threadsafe queue put
-        loop = asyncio.get_event_loop()
+    def _fetch_unread(self, loop: asyncio.AbstractEventLoop) -> None:
         with imaplib.IMAP4_SSL("imap.gmail.com") as imap:
             imap.login(self._user, self._password)
             imap.select("INBOX")
