@@ -26,9 +26,11 @@ type IncomingMessage struct {
 }
 
 var (
-	client   *whatsmeow.Client
-	msgQueue []IncomingMessage
-	mu       sync.Mutex
+	client      *whatsmeow.Client
+	msgQueue    []IncomingMessage
+	mu          sync.Mutex
+	latestQR    string
+	qrMu        sync.RWMutex
 )
 
 func eventHandler(evt interface{}) {
@@ -89,21 +91,47 @@ func main() {
 		if err != nil {
 			log.Fatalf("Connect failed: %v", err)
 		}
-		for evt := range qrChan {
-			if evt.Event == "code" {
-				fmt.Println("QR CODE (scan with WhatsApp on your phone):")
-				fmt.Println(evt.Code)
-			} else {
-				log.Printf("QR event: %s", evt.Event)
-				break
+		go func() {
+			for evt := range qrChan {
+				if evt.Event == "code" {
+					qrMu.Lock()
+					latestQR = evt.Code
+					qrMu.Unlock()
+					log.Printf("New QR code ready — open http://<pi-ip>:%s/qr to scan", port)
+				} else {
+					log.Printf("QR event: %s", evt.Event)
+				}
 			}
-		}
+		}()
 	} else {
 		err = client.Connect()
 		if err != nil {
 			log.Fatalf("Connect failed: %v", err)
 		}
 	}
+
+	// QR web page — renders scannable QR via qrcode.js
+	http.HandleFunc("/qr", func(w http.ResponseWriter, r *http.Request) {
+		qrMu.RLock()
+		qr := latestQR
+		qrMu.RUnlock()
+		if qr == "" && client.IsLoggedIn() {
+			fmt.Fprintln(w, "<h2>Already logged in!</h2>")
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintf(w, `<!DOCTYPE html><html><head>
+<meta http-equiv="refresh" content="20">
+<title>WhatsApp QR</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head><body style="font-family:sans-serif;text-align:center;padding:40px">
+<h2>Scan with WhatsApp</h2>
+<p>WhatsApp → Settings → Linked Devices → Link a Device</p>
+<div id="qr"></div>
+<p><small>Page auto-refreshes every 20s for new QR codes</small></p>
+<script>new QRCode(document.getElementById("qr"), {text: %q, width:256, height:256});</script>
+</body></html>`, qr)
+	})
 
 	http.HandleFunc("/messages", func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
@@ -146,6 +174,6 @@ func main() {
 		})
 	})
 
-	log.Printf("WhatsApp bridge listening on :%s", port)
+	log.Printf("WhatsApp bridge listening on :%s — open http://<pi-ip>:%s/qr to scan", port, port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
