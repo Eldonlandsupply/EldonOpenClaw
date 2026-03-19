@@ -58,6 +58,8 @@ func eventHandler(evt interface{}) {
 }
 
 func main() {
+	ctx := context.Background()
+
 	port := os.Getenv("WA_BRIDGE_PORT")
 	if port == "" {
 		port = "8181"
@@ -69,11 +71,11 @@ func main() {
 	os.MkdirAll("/var/lib/wabridge", 0700)
 
 	dbLog := waLog.Stdout("Database", "WARN", true)
-	container, err := sqlstore.New("sqlite3", "file:"+dbPath+"?_foreign_keys=on", dbLog)
+	container, err := sqlstore.New(ctx, "sqlite3", "file:"+dbPath+"?_foreign_keys=on", dbLog)
 	if err != nil {
 		log.Fatalf("DB init failed: %v", err)
 	}
-	deviceStore, err := container.GetFirstDevice()
+	deviceStore, err := container.GetFirstDevice(ctx)
 	if err != nil {
 		log.Fatalf("Device store failed: %v", err)
 	}
@@ -82,14 +84,14 @@ func main() {
 	client.AddEventHandler(eventHandler)
 
 	if client.Store.ID == nil {
-		qrChan, _ := client.GetQRChannel(context.Background())
+		qrChan, _ := client.GetQRChannel(ctx)
 		err = client.Connect()
 		if err != nil {
 			log.Fatalf("Connect failed: %v", err)
 		}
 		for evt := range qrChan {
 			if evt.Event == "code" {
-				fmt.Println("QR CODE (scan with WhatsApp):")
+				fmt.Println("QR CODE (scan with WhatsApp on your phone):")
 				fmt.Println(evt.Code)
 			} else {
 				log.Printf("QR event: %s", evt.Event)
@@ -127,7 +129,7 @@ func main() {
 			return
 		}
 		msg := &waProto.Message{Conversation: proto.String(req.Text)}
-		_, err = client.SendMessage(context.Background(), jid, msg)
+		_, err = client.SendMessage(ctx, jid, msg)
 		if err != nil {
 			http.Error(w, "send failed: "+err.Error(), 500)
 			return
@@ -137,12 +139,10 @@ func main() {
 	})
 
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		connected := client.IsConnected()
-		loggedIn := client.IsLoggedIn()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]bool{
-			"connected": connected,
-			"logged_in": loggedIn,
+			"connected": client.IsConnected(),
+			"logged_in": client.IsLoggedIn(),
 		})
 	})
 
