@@ -55,7 +55,7 @@ class WhatsAppConnector(BaseConnector):
                     f"{self._bridge_url}/messages", timeout=aiohttp.ClientTimeout(total=5)
                 ) as resp:
                     if resp.status == 200:
-                        msgs = await resp.json()
+                        msgs = await resp.json() or []
                         for m in msgs:
                             sender = m.get("from", "")
                             text = m.get("text", "").strip()
