@@ -61,7 +61,6 @@ class WhatsAppConnector(BaseConnector):
                             text = m.get("text", "").strip()
                             if not text:
                                 continue
-                            # normalize: strip @s.whatsapp.net, check allowed
                             number = sender.split("@")[0]
                             if self._allowed and number not in self._allowed:
                                 logger.info("WhatsApp message from unlisted number ignored",
@@ -92,7 +91,6 @@ class WhatsAppConnector(BaseConnector):
         if not chat_id:
             logger.warning("WhatsApp send called with no chat_id")
             return
-        # Ensure JID format: number@s.whatsapp.net
         jid = chat_id if "@" in chat_id else f"{chat_id}@s.whatsapp.net"
         try:
             async with self._session.post(
