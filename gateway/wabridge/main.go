@@ -60,8 +60,12 @@ func eventHandler(evt interface{}) {
 	}
 }
 
-func connectWithQRLoop(ctx context.Context, dbPath string) {
+func connectLoop(ctx context.Context, dbPath string) {
 	for {
+		if ctx.Err() != nil {
+			return
+		}
+
 		dbLog := waLog.Stdout("Database", "WARN", true)
 		container, err := sqlstore.New(ctx, "sqlite3", "file:"+dbPath+"?_foreign_keys=on", dbLog)
 		if err != nil {
@@ -76,18 +80,21 @@ func connectWithQRLoop(ctx context.Context, dbPath string) {
 			continue
 		}
 		clientLog := waLog.Stdout("Client", "WARN", true)
-		client = whatsmeow.NewClient(deviceStore, clientLog)
-		client.AddEventHandler(eventHandler)
+		c := whatsmeow.NewClient(deviceStore, clientLog)
+		c.AddEventHandler(eventHandler)
 
-		if client.Store.ID == nil {
-			// Not logged in — get QR channel and connect
-			qrChan, _ := client.GetQRChannel(ctx)
-			err = client.Connect()
-			if err != nil {
+		if c.Store.ID == nil {
+			// Not logged in — QR flow
+			qrChan, _ := c.GetQRChannel(ctx)
+			if err = c.Connect(); err != nil {
 				log.Printf("Connect failed: %v — retrying in 5s", err)
 				time.Sleep(5 * time.Second)
 				continue
 			}
+			mu.Lock()
+			client = c
+			mu.Unlock()
+
 			linked := false
 			for evt := range qrChan {
 				if evt.Event == "code" {
@@ -97,33 +104,53 @@ func connectWithQRLoop(ctx context.Context, dbPath string) {
 					log.Printf("QR ready — open http://<pi-ip>:8181/qr to scan")
 				} else if evt.Event == "success" {
 					log.Printf("QR scanned — logged in!")
+					qrMu.Lock()
+					latestQR = ""
+					qrMu.Unlock()
 					linked = true
 				} else {
 					log.Printf("QR event: %s", evt.Event)
 				}
 			}
 			if !linked {
-				// QR timed out — disconnect and retry the whole flow
 				log.Printf("QR timeout — restarting login flow in 3s")
-				client.Disconnect()
-				qrMu.Lock()
-				latestQR = ""
-				qrMu.Unlock()
+				c.Disconnect()
+				mu.Lock()
+				client = nil
+				mu.Unlock()
 				time.Sleep(3 * time.Second)
 				continue
 			}
+			// Linked — client stays connected, fall through to keepalive
 		} else {
-			err = client.Connect()
-			if err != nil {
-				log.Printf("Connect failed: %v — retrying in 5s", err)
+			// Already have session — reconnect
+			if err = c.Connect(); err != nil {
+				log.Printf("Reconnect failed: %v — retrying in 5s", err)
 				time.Sleep(5 * time.Second)
 				continue
 			}
+			mu.Lock()
+			client = c
+			mu.Unlock()
 			log.Printf("Reconnected with stored session")
 		}
-		// Connected — block until disconnected
-		<-ctx.Done()
-		return
+
+		// Keep alive — wait until disconnected then reconnect
+		for {
+			if ctx.Err() != nil {
+				return
+			}
+			if !c.IsConnected() {
+				log.Printf("Client disconnected — reconnecting in 5s")
+				c.Disconnect()
+				mu.Lock()
+				client = nil
+				mu.Unlock()
+				time.Sleep(5 * time.Second)
+				break
+			}
+			time.Sleep(5 * time.Second)
+		}
 	}
 }
 
@@ -139,17 +166,17 @@ func main() {
 	os.MkdirAll("/var/lib/wabridge", 0700)
 
 	ctx := context.Background()
+	go connectLoop(ctx, dbPath)
 
-	// Start QR/connect loop in background
-	go connectWithQRLoop(ctx, dbPath)
-
-	// QR web page — auto-refreshes every 15s
 	http.HandleFunc("/qr", func(w http.ResponseWriter, r *http.Request) {
 		qrMu.RLock()
 		qr := latestQR
 		qrMu.RUnlock()
 		w.Header().Set("Content-Type", "text/html")
-		if client != nil && client.IsLoggedIn() {
+		mu.Lock()
+		c := client
+		mu.Unlock()
+		if c != nil && c.IsLoggedIn() {
 			fmt.Fprintln(w, "<h2 style='font-family:sans-serif;text-align:center;padding:40px'>Already linked!</h2>")
 			return
 		}
@@ -165,7 +192,7 @@ func main() {
 <h2>Scan with WhatsApp</h2>
 <p>WhatsApp &rarr; Settings &rarr; Linked Devices &rarr; Link a Device</p>
 <div id="qr" style="display:inline-block"></div>
-<p><small>Page auto-refreshes every 15s for a fresh QR code</small></p>
+<p><small>Page auto-refreshes every 15s</small></p>
 <script>new QRCode(document.getElementById("qr"), {text: %q, width:300, height:300});</script>
 </body></html>`, qr)
 	})
@@ -192,7 +219,10 @@ func main() {
 			http.Error(w, "bad request", 400)
 			return
 		}
-		if client == nil || !client.IsLoggedIn() {
+		mu.Lock()
+		c := client
+		mu.Unlock()
+		if c == nil || !c.IsLoggedIn() {
 			http.Error(w, "not logged in", 503)
 			return
 		}
@@ -202,7 +232,7 @@ func main() {
 			return
 		}
 		msg := &waProto.Message{Conversation: proto.String(req.Text)}
-		_, err = client.SendMessage(ctx, jid, msg)
+		_, err = c.SendMessage(ctx, jid, msg)
 		if err != nil {
 			http.Error(w, "send failed: "+err.Error(), 500)
 			return
@@ -213,8 +243,11 @@ func main() {
 
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		connected := client != nil && client.IsConnected()
-		loggedIn := client != nil && client.IsLoggedIn()
+		mu.Lock()
+		c := client
+		mu.Unlock()
+		connected := c != nil && c.IsConnected()
+		loggedIn := c != nil && c.IsLoggedIn()
 		json.NewEncoder(w).Encode(map[string]bool{
 			"connected": connected,
 			"logged_in": loggedIn,
