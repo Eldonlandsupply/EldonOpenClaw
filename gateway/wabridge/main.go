@@ -60,41 +60,43 @@ func eventHandler(evt interface{}) {
 	}
 }
 
+func initClient(ctx context.Context, dbPath string) (*whatsmeow.Client, error) {
+	dbLog := waLog.Stdout("Database", "WARN", true)
+	container, err := sqlstore.New(ctx, "sqlite3", "file:"+dbPath+"?_foreign_keys=on", dbLog)
+	if err != nil {
+		return nil, err
+	}
+	deviceStore, err := container.GetFirstDevice(ctx)
+	if err != nil {
+		return nil, err
+	}
+	clientLog := waLog.Stdout("Client", "WARN", true)
+	c := whatsmeow.NewClient(deviceStore, clientLog)
+	c.AddEventHandler(eventHandler)
+	return c, nil
+}
+
 func connectLoop(ctx context.Context, dbPath string) {
 	for {
-		if ctx.Err() != nil {
-			return
+		c, err := initClient(ctx, dbPath)
+		if err != nil {
+			log.Printf("client init failed: %v — retrying in 5s", err)
+			time.Sleep(5 * time.Second)
+			continue
 		}
 
-		dbLog := waLog.Stdout("Database", "WARN", true)
-		container, err := sqlstore.New(ctx, "sqlite3", "file:"+dbPath+"?_foreign_keys=on", dbLog)
-		if err != nil {
-			log.Printf("DB init failed: %v — retrying in 5s", err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		deviceStore, err := container.GetFirstDevice(ctx)
-		if err != nil {
-			log.Printf("Device store failed: %v — retrying in 5s", err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		clientLog := waLog.Stdout("Client", "WARN", true)
-		c := whatsmeow.NewClient(deviceStore, clientLog)
-		c.AddEventHandler(eventHandler)
+		mu.Lock()
+		client = c
+		mu.Unlock()
 
 		if c.Store.ID == nil {
-			// Not logged in — QR flow
+			// Need QR login
 			qrChan, _ := c.GetQRChannel(ctx)
-			if err = c.Connect(); err != nil {
-				log.Printf("Connect failed: %v — retrying in 5s", err)
+			if err := c.Connect(); err != nil {
+				log.Printf("connect failed: %v — retrying in 5s", err)
 				time.Sleep(5 * time.Second)
 				continue
 			}
-			mu.Lock()
-			client = c
-			mu.Unlock()
-
 			linked := false
 			for evt := range qrChan {
 				if evt.Event == "code" {
@@ -115,41 +117,31 @@ func connectLoop(ctx context.Context, dbPath string) {
 			if !linked {
 				log.Printf("QR timeout — restarting login flow in 3s")
 				c.Disconnect()
-				mu.Lock()
-				client = nil
-				mu.Unlock()
 				time.Sleep(3 * time.Second)
 				continue
 			}
-			// Linked — client stays connected, fall through to keepalive
+			// Logged in — stay connected, monitor for disconnect
 		} else {
-			// Already have session — reconnect
-			if err = c.Connect(); err != nil {
-				log.Printf("Reconnect failed: %v — retrying in 5s", err)
-				time.Sleep(5 * time.Second)
+			// Already have session — just connect
+			if err := c.Connect(); err != nil {
+				log.Printf("reconnect failed: %v — retrying in 10s", err)
+				time.Sleep(10 * time.Second)
 				continue
 			}
-			mu.Lock()
-			client = c
-			mu.Unlock()
 			log.Printf("Reconnected with stored session")
 		}
 
-		// Keep alive — wait until disconnected then reconnect
+		// Monitor connection — reconnect if dropped
 		for {
+			time.Sleep(10 * time.Second)
 			if ctx.Err() != nil {
 				return
 			}
 			if !c.IsConnected() {
-				log.Printf("Client disconnected — reconnecting in 5s")
+				log.Printf("Connection dropped — reconnecting")
 				c.Disconnect()
-				mu.Lock()
-				client = nil
-				mu.Unlock()
-				time.Sleep(5 * time.Second)
 				break
 			}
-			time.Sleep(5 * time.Second)
 		}
 	}
 }
@@ -173,15 +165,12 @@ func main() {
 		qr := latestQR
 		qrMu.RUnlock()
 		w.Header().Set("Content-Type", "text/html")
-		mu.Lock()
-		c := client
-		mu.Unlock()
-		if c != nil && c.IsLoggedIn() {
+		if client != nil && client.IsLoggedIn() {
 			fmt.Fprintln(w, "<h2 style='font-family:sans-serif;text-align:center;padding:40px'>Already linked!</h2>")
 			return
 		}
 		if qr == "" {
-			fmt.Fprintln(w, "<h3 style='font-family:sans-serif;text-align:center;padding:40px'>Generating QR... refresh in a moment.</h3><meta http-equiv='refresh' content='3'>")
+			fmt.Fprintln(w, "<h3 style='font-family:sans-serif;text-align:center;padding:40px'>Generating QR... <meta http-equiv='refresh' content='3'></h3>")
 			return
 		}
 		fmt.Fprintf(w, `<!DOCTYPE html><html><head>
@@ -242,10 +231,10 @@ func main() {
 	})
 
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
 		mu.Lock()
 		c := client
 		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
 		connected := c != nil && c.IsConnected()
 		loggedIn := c != nil && c.IsLoggedIn()
 		json.NewEncoder(w).Encode(map[string]bool{
@@ -254,6 +243,6 @@ func main() {
 		})
 	})
 
-	log.Printf("WhatsApp bridge listening on :%s — open http://<pi-ip>:%s/qr to scan", port, port)
+	log.Printf("WhatsApp bridge listening on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
